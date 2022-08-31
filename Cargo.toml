@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "drax_core",
+    "drax_derive"
+]
