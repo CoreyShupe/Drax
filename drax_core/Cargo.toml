@@ -13,11 +13,17 @@ cfb8 = { version = "0.7.1", optional = true }
 aes = { version = "0.7.5", optional = true }
 pin-project-lite = "0.2.9"
 tokio-test = { version = "0.4.2", optional = true }
+flate2 = { version = "1.0.23", optional = true, features = ["zlib"] }
+bytes = "1.2.1"
+serde = "1.0.144"
+serde_json = "1.0.85"
 
 [features]
-full = ["encryption"]
+full = ["encryption", "compression", "pipelines"]
 
 encryption = ["dep:cfb8", "dep:aes"]
+compression = ["dep:flate2"]
+pipelines = []
 
 dev = ["full", "footprints"]
 footprints = []

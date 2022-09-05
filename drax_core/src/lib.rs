@@ -1,3 +1,4 @@
+#![feature(cursor_remaining)]
 //! # Drax
 //!
 //! Drax is a library which supports framed packet reading and writing.
@@ -27,3 +28,9 @@ pub mod extension;
 pub mod prelude;
 pub mod primitives;
 pub mod transport;
+
+// stub types
+pub type VarInt = i32;
+pub type VarLong = i64;
+pub type SizedVec<T> = Vec<T>;
+pub type Maybe<T> = Option<T>;
