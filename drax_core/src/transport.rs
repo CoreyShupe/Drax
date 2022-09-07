@@ -10,7 +10,7 @@ pub mod frame;
 pub mod pipeline;
 
 use std::fmt::{Display, Formatter};
-use std::io::{Read, Write};
+use std::io::Read;
 use std::num::TryFromIntError;
 use std::string::FromUtf8Error;
 use tokio::io::AsyncRead;

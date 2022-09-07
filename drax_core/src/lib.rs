@@ -1,4 +1,3 @@
-#![feature(cursor_remaining)]
 //! # Drax
 //!
 //! Drax is a library which supports framed packet reading and writing.
