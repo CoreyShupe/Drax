@@ -19,7 +19,7 @@ macro_rules! match_comma {
     };
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum SerialType {
     Raw(Option<Literal>),
     Json(Literal),
@@ -120,13 +120,14 @@ fn parse_include_statement(args: &mut IntoIter) -> IncludeStatement {
         panic!("Did not find an ident following the as in an include def.");
     };
     IncludeStatement {
-        key_ty: key_ty.clone(),
+        key_ty: TokenStream::from(TokenTree::from(key_ty.clone())),
         value_name: value_name.clone(),
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct IncludeStatement {
-    pub(crate) key_ty: Ident,
+    pub(crate) key_ty: TokenStream,
     pub(crate) value_name: Ident,
 }
 
@@ -135,12 +136,12 @@ impl ToTokens for IncludeStatement {
         let key_ty = &self.key_ty;
         let value_name = &self.value_name;
         tokens.append_all(quote::quote! {
-            let #value_name = context.retrieve_data::<#key_ty>().unwrap();
+            let #value_name = context.retrieve_data::<#key_ty>().map(|x| *x).unwrap();
         });
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub(crate) struct StructAttributeSheet {
     pub(crate) includes: Vec<IncludeStatement>,
     pub(crate) enum_default: Option<TokenStream>,
@@ -183,11 +184,11 @@ impl StructAttributeSheet {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct TypeAttributeSheet {
     pub(crate) serial_type: SerialType,
     pub(crate) skip_if: Option<TokenStream>,
     pub(crate) default: Option<TokenStream>,
-    pub(crate) enum_key: Option<TokenStream>,
 }
 
 impl Default for TypeAttributeSheet {
@@ -196,7 +197,6 @@ impl Default for TypeAttributeSheet {
             serial_type: SerialType::Raw(Option::default()),
             skip_if: Option::default(),
             default: Option::default(),
-            enum_key: Option::default(),
         }
     }
 }
@@ -233,7 +233,6 @@ impl TypeAttributeSheet {
                     }
                     "skip_if" => self.skip_if = Some(parse_continued_token_stream(&mut args)),
                     "default" => self.default = Some(parse_continued_token_stream(&mut args)),
-                    "key" => self.enum_key = Some(parse_continued_token_stream(&mut args)),
                     _ => panic!("Unknown ident {}.", ident),
                 },
                 _ => panic!("Cannot define the base of the args as a non ident: {:?}", x),
@@ -254,6 +253,7 @@ impl TypeAttributeSheet {
     }
 }
 
+#[derive(Clone)]
 pub(crate) enum RawType {
     VarInt,
     VarLong,
@@ -267,7 +267,7 @@ pub(crate) enum RawType {
 }
 
 impl RawType {
-    fn from_token_stream(mut stream: IntoIter) -> RawType {
+    pub fn from_token_stream(mut stream: IntoIter) -> RawType {
         while let Some(tree) = stream.next() {
             match tree {
                 TokenTree::Ident(pop_ident) => match pop_ident.to_string().as_str() {
@@ -504,7 +504,6 @@ pub(crate) fn create_type_de(
                 {
                     let length = drax::extension::read_var_int_sync(context, reader)?;
                     let mut #ident = Vec::with_capacity(length as usize);
-                    drax::extension::write_var_int_sync(#ident.len().try_into()?, context, reader)?;
                     for _ in 0..length {
                         let #next_ident = {
                             #inner_type_de
@@ -537,9 +536,10 @@ pub(crate) fn create_type_de(
                     let mut #ident = Vec::new();
                     let mut full_read = Vec::new();
                     reader.read_to_end(&mut full_read)?;
+                    let len = #ident.len();
                     let mut cursor = Cursor::new(full_read);
 
-                    while cursor.has_remaining() {
+                    while cursor.position() as usize != len {
                         let #next_ident = {
                             #inner_type_de
                         };

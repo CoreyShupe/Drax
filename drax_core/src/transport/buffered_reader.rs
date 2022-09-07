@@ -6,7 +6,7 @@ use std::future::Future;
 use std::io::Cursor;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio::io::{AsyncRead, AsyncReadExt, ReadBuf};
+use tokio::io::{AsyncRead, ReadBuf};
 
 pub struct DraxTransportPipeline<T2> {
     pipeline: super::pipeline::BoxedChain<Vec<u8>, T2>,
@@ -14,6 +14,10 @@ pub struct DraxTransportPipeline<T2> {
 }
 
 impl<T2> DraxTransportPipeline<T2> {
+    pub fn new(pipeline: super::pipeline::BoxedChain<Vec<u8>, T2>, buffer: BytesMut) -> Self {
+        Self { pipeline, buffer }
+    }
+
     pub fn read_transport_packet<'a, R>(
         &'a mut self,
         context: &'a mut TransportProcessorContext,
@@ -47,7 +51,7 @@ where
     type Output = crate::transport::Result<T>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut me = self.project();
+        let me = self.project();
         // poll read buffer mostly from read_buf in tokio AsyncReadExt
         {
             use std::mem::MaybeUninit;
@@ -68,6 +72,10 @@ where
                 buf.filled().len()
             };
 
+            if n > 0 {
+                println!("Read {} bytes", n);
+            }
+
             // Safety: This is guaranteed to be the number of initialized (and read)
             // bytes due to the invariants provided by `ReadBuf::filled`.
             unsafe {
@@ -85,11 +93,11 @@ where
                     Ok(size) => {
                         let mut ready_size_inner = me.ready_size;
                         *ready_size_inner = Some(size as usize);
-                        me.current_buffer
-                            .advance(chunk_cursor.position() as usize - 1);
+                        me.current_buffer.advance(chunk_cursor.position() as usize);
                         size as usize
                     }
                     Err(_) => {
+                        cx.waker().wake_by_ref();
                         return Poll::Pending;
                     }
                 }
@@ -105,9 +113,11 @@ where
                 .unwrap_or_else(|| Error::cause("Failed to read buffer completely"));
             let capacity = me.current_buffer.capacity();
             let len = me.current_buffer.len();
+            me.current_buffer.advance(size);
             me.current_buffer.reserve(capacity - len);
             Poll::Ready(chunk_result)
         } else {
+            cx.waker().wake_by_ref();
             Poll::Pending
         }
     }

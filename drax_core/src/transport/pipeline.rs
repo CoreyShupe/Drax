@@ -1,5 +1,4 @@
 use crate::transport::TransportProcessorContext;
-use std::mem::{ManuallyDrop, MaybeUninit};
 
 pub trait ChainProcessor {
     type Input;

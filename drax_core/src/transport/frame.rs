@@ -1,11 +1,8 @@
-#[cfg(feature = "footprints")]
-use crate::transport::Footprint;
 use crate::transport::{Error, TransportProcessorContext};
 use std::io::{Cursor, Read};
 
 pub struct PacketFrame {
-    packet_id: i32,
-    data: Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 #[cfg(feature = "compression")]
@@ -27,32 +24,29 @@ pub struct FrameEncoder {
 }
 
 impl FrameEncoder {
-    fn create_uncompressed_packet(
-        context: &mut TransportProcessorContext,
-        frame: PacketFrame,
-    ) -> crate::transport::Result<Vec<u8>> {
-        let PacketFrame { packet_id, data } = frame;
+    #[cfg(feature = "compression")]
+    pub fn new(compression_threshold: isize) -> Self {
+        Self {
+            compression_threshold,
+        }
+    }
 
-        let packet_id_size = crate::extension::size_var_int(packet_id, context)?;
-        let mut var_int_bytes = Vec::with_capacity(packet_id_size);
-        crate::extension::write_var_int_sync(packet_id, context, &mut var_int_bytes)?;
-        Ok([var_int_bytes, data].concat())
+    #[cfg(not(feature = "compression"))]
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    fn create_uncompressed_packet(frame: PacketFrame) -> crate::transport::Result<Vec<u8>> {
+        let PacketFrame { data } = frame;
+        Ok(data)
     }
 
     fn create_compressed_packet_frame(
         &self,
-        context: &mut TransportProcessorContext,
+        _context: &mut TransportProcessorContext,
         frame: PacketFrame,
     ) -> crate::transport::Result<CompressedPacketFrame> {
-        #[cfg(feature = "footprints")]
-        context.mark(Footprint::note_struct(
-            "TryFrom<PacketFrame> -> CompressedPacketFrame",
-        ));
-
-        let extra_size = crate::extension::size_var_int(frame.packet_id, context)?;
-        let mut var_int_bytes = Vec::with_capacity(extra_size);
-        crate::extension::write_var_int_sync(frame.packet_id, context, &mut var_int_bytes)?;
-        let data = [var_int_bytes, frame.data].concat();
+        let data = frame.data;
         let true_data_len = data.len();
         if data.len() < self.compression_threshold as usize {
             Ok(CompressedPacketFrame {
@@ -80,10 +74,7 @@ impl ChainProcessor for FrameEncoder {
         context: &mut TransportProcessorContext,
         input: Self::Input,
     ) -> crate::transport::Result<Self::Output> {
-        #[cfg(feature = "footprints")]
-        context.mark(Footprint::note_type("FrameEncoder"));
-
-        if cfg!(feature = "compression") {
+        if cfg!(feature = "compression") && self.compression_threshold >= 0 {
             let CompressedPacketFrame {
                 decompressed_data_length,
                 compressed_data,
@@ -96,7 +87,7 @@ impl ChainProcessor for FrameEncoder {
             crate::extension::write_var_int_sync(decompressed_data_length, context, &mut data)?;
             Ok([data, compressed].concat())
         } else {
-            FrameEncoder::create_uncompressed_packet(context, input)
+            FrameEncoder::create_uncompressed_packet(input)
         }
     }
 }
@@ -106,14 +97,12 @@ pub struct FrameDecoder {
     compression_threshold: isize,
 }
 
+#[cfg(feature = "compression")]
 impl Default for FrameDecoder {
     fn default() -> Self {
-        #[cfg(feature = "compression")]
         return Self {
             compression_threshold: -1,
         };
-        #[cfg(not(feature = "compression"))]
-        Self {}
     }
 }
 
@@ -130,27 +119,14 @@ impl FrameDecoder {
         Self {}
     }
 
-    fn read_raw_packet(
-        context: &mut TransportProcessorContext,
-        data: Vec<u8>,
-    ) -> crate::transport::Result<PacketFrame> {
-        let mut data_cursor = Cursor::new(data);
-        let packet_id = crate::extension::read_var_int_sync(context, &mut data_cursor)?;
-        Ok(PacketFrame {
-            packet_id,
-            data: Vec::from(data_cursor.remaining_slice()),
-        })
+    fn create_raw_packet(data: Vec<u8>) -> crate::transport::Result<PacketFrame> {
+        Ok(PacketFrame { data })
     }
 
     fn decompress_frame(
-        context: &mut TransportProcessorContext,
+        _context: &mut TransportProcessorContext,
         frame: CompressedPacketFrame,
     ) -> crate::transport::Result<PacketFrame> {
-        #[cfg(feature = "footprints")]
-        context.mark(Footprint::note_struct(
-            "TryFrom<CompressedPacketFrame> -> PacketFrame",
-        ));
-
         let data_length = frame.decompressed_data_length as usize;
         let data = if data_length == 0 {
             frame.compressed_data.into_inner()
@@ -166,12 +142,7 @@ impl FrameDecoder {
             }
             preconditioned_data
         };
-        let mut data_cursor = Cursor::new(data);
-        let packet_id = crate::extension::read_var_int_sync(context, &mut data_cursor)?;
-        Ok(PacketFrame {
-            packet_id,
-            data: Vec::from(data_cursor.remaining_slice()),
-        })
+        Ok(PacketFrame { data })
     }
 }
 
@@ -184,9 +155,6 @@ impl ChainProcessor for FrameDecoder {
         context: &mut TransportProcessorContext,
         input: Self::Input,
     ) -> crate::transport::Result<Self::Output> {
-        #[cfg(feature = "footprints")]
-        context.mark(Footprint::note_type("FrameDecoder"));
-
         #[cfg(feature = "compression")]
         if self.compression_threshold >= 0 {
             let mut data_cursor = Cursor::new(input);
@@ -198,6 +166,6 @@ impl ChainProcessor for FrameDecoder {
             };
             return FrameDecoder::decompress_frame(context, compressed_frame);
         }
-        FrameDecoder::read_raw_packet(context, input)
+        FrameDecoder::create_raw_packet(input)
     }
 }

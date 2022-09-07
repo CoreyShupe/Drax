@@ -11,11 +11,17 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 pub type EncryptionStream = Cfb8<Aes128>;
 
 pin_project! {
-    struct EncryptedWriter<W> {
+    pub struct EncryptedWriter<W> {
         #[pin]
         write: W,
         #[pin]
         stream: EncryptionStream,
+    }
+}
+
+impl<W> EncryptedWriter<W> {
+    pub fn new(write: W, stream: EncryptionStream) -> EncryptedWriter<W> {
+        EncryptedWriter { write, stream }
     }
 }
 
@@ -41,11 +47,17 @@ impl<W: AsyncWrite + Unpin + Sized> AsyncWrite for EncryptedWriter<W> {
 }
 
 pin_project! {
-    struct DecryptRead<R> {
+    pub struct DecryptRead<R> {
         #[pin]
         read: R,
         #[pin]
         stream: EncryptionStream,
+    }
+}
+
+impl<R> DecryptRead<R> {
+    pub fn new(read: R, stream: EncryptionStream) -> DecryptRead<R> {
+        DecryptRead { read, stream }
     }
 }
 

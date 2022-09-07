@@ -1,20 +1,18 @@
 #[cfg(feature = "pipelines")]
 pub mod buffered_reader;
-#[cfg(feature = "encryption")]
-mod encryption;
 #[cfg(feature = "pipelines")]
-mod frame;
+pub mod buffered_writer;
+#[cfg(feature = "encryption")]
+pub mod encryption;
+#[cfg(feature = "pipelines")]
+pub mod frame;
 #[cfg(feature = "pipelines")]
 pub mod pipeline;
 
-use bytes::BytesMut;
 use std::fmt::{Display, Formatter};
-use std::future::Future;
 use std::io::{Read, Write};
 use std::num::TryFromIntError;
-use std::pin::Pin;
 use std::string::FromUtf8Error;
-use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 
 #[derive(Debug)]
@@ -80,32 +78,7 @@ impl From<serde_json::Error> for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[cfg(feature = "footprints")]
-#[derive(Debug)]
-pub enum Footprint {
-    Struct(String),
-    Field(String),
-    Type(String),
-}
-
-#[cfg(feature = "footprints")]
-impl Footprint {
-    pub fn note_struct<S: Into<String>>(string: S) -> Self {
-        Self::Struct(string.into())
-    }
-
-    pub fn note_field<S: Into<String>>(string: S) -> Self {
-        Self::Field(string.into())
-    }
-
-    pub fn note_type<S: Into<String>>(string: S) -> Self {
-        Self::Type(string.into())
-    }
-}
-
 pub struct TransportProcessorContext {
-    #[cfg(feature = "footprints")]
-    footprints: Vec<Footprint>,
     data_map: crate::prelude::TypeMap,
 }
 
@@ -118,20 +91,8 @@ impl Default for TransportProcessorContext {
 impl TransportProcessorContext {
     pub fn new() -> Self {
         Self {
-            #[cfg(feature = "footprints")]
-            footprints: Vec::new(),
             data_map: crate::prelude::TypeMap::new(),
         }
-    }
-
-    #[cfg(feature = "footprints")]
-    pub fn mark(&mut self, footprint: Footprint) {
-        self.footprints.push(footprint)
-    }
-
-    #[cfg(feature = "footprints")]
-    pub fn footprints(&self) -> &Vec<Footprint> {
-        &self.footprints
     }
 
     pub async fn read_next_var_int<R: AsyncRead + Unpin>(&mut self, read: &mut R) -> Result<i32> {
@@ -148,10 +109,10 @@ impl TransportProcessorContext {
 }
 
 pub trait DraxTransport {
-    fn write_to_transport<W: Write>(
+    fn write_to_transport(
         &self,
         context: &mut TransportProcessorContext,
-        writer: &mut W,
+        writer: &mut Vec<u8>,
     ) -> Result<()>;
 
     fn read_from_transport<R: Read>(
