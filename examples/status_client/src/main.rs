@@ -1,3 +1,4 @@
+use drax::link;
 use drax::transport::buffered_writer::{FrameSizeAppender, GenericWriter};
 use drax::transport::frame::FrameEncoder;
 use drax::transport::pipeline::{link, ChainProcessor};
@@ -13,7 +14,7 @@ pub struct StatusRequest;
 pub struct StatusResponse(#[drax(json = 32767)] serde_json::Value);
 
 #[derive(drax_derive::DraxTransport)]
-#[drax(key = {match VarInt})]
+#[drax(key = {VarInt})]
 pub enum NextState {
     Handshake,
     Status,
@@ -97,18 +98,11 @@ pub async fn main() -> anyhow::Result<()> {
     let client = tokio::net::TcpStream::connect("mh-prd.minehut.com:25565").await?;
     let (mut read, mut write) = client.into_split();
 
-    let full_chain = link(
-        Box::new(drax::transport::frame::FrameDecoder::new(-1)),
-        Box::new(StatusResponseChainProcessor),
+    let full_chain = link!(
+        drax::transport::frame::FrameDecoder::new(-1),
+        StatusResponseChainProcessor
     );
-
-    let mut write_pipeline = link(
-        Box::new(GenericWriter),
-        Box::new(link(
-            Box::new(FrameEncoder::new(-1)),
-            Box::new(FrameSizeAppender),
-        )),
-    );
+    let mut write_pipeline = link!(GenericWriter, FrameEncoder::new(-1), FrameSizeAppender);
 
     let buffer = drax::prelude::BytesMut::with_capacity(BUFFER_CAPACITY);
     let mut drax_transport_pipeline =

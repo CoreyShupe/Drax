@@ -47,3 +47,13 @@ impl<T1, T2, T3> ChainProcessor for ProcessChainLink<T1, T2, T3> {
         self.process_chain_fn.process(context, linkage)
     }
 }
+
+#[macro_export]
+macro_rules! link {
+    ($l1:expr, $l2:expr) => {
+        drax::transport::pipeline::link(Box::new($l1), Box::new($l2));
+    };
+    ($l1:expr, $l2:expr, $($etc:expr)+) => {
+        link!($l1, link!($l2, $($etc)+));
+    };
+}

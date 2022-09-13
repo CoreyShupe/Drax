@@ -14,8 +14,5 @@ pub fn derive_drax_transport(item: proc_macro::TokenStream) -> proc_macro::Token
         Data::Enum(ref data_enum) => r#enum::expand_drax_enum(&derive_input, &data_enum),
         Data::Union(_) => unimplemented!(),
     };
-    println!("---------------------");
-    println!("{}", x);
-    println!("---------------------");
     TokenStream::from(x)
 }

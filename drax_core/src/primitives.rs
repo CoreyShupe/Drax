@@ -2,7 +2,7 @@ use crate::transport::{DraxTransport, TransportProcessorContext};
 use std::io::{Read, Write};
 
 macro_rules! define_primitive {
-    ($prim_type:ty, $byte_count: literal) => {
+    ($prim_type:ty, $byte_count:literal) => {
         impl DraxTransport for $prim_type {
             fn write_to_transport(
                 &self,
