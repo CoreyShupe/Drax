@@ -79,7 +79,7 @@ impl From<serde_json::Error> for Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct TransportProcessorContext {
-    data_map: crate::prelude::TypeMap,
+    data_map: crate::prelude::SendMap,
 }
 
 impl Default for TransportProcessorContext {
@@ -91,7 +91,7 @@ impl Default for TransportProcessorContext {
 impl TransportProcessorContext {
     pub fn new() -> Self {
         Self {
-            data_map: crate::prelude::TypeMap::new(),
+            data_map: crate::prelude::SendMap::custom(),
         }
     }
 
@@ -99,11 +99,17 @@ impl TransportProcessorContext {
         crate::extension::read_var_int(self, read).await
     }
 
-    pub fn retrieve_data<T: crate::prelude::Key>(&self) -> Option<&T::Value> {
+    pub fn retrieve_data<T: crate::prelude::Key>(&self) -> Option<&T::Value>
+    where
+        T::Value: Send,
+    {
         self.data_map.get::<T>()
     }
 
-    pub fn retrieve_data_mut<T: crate::prelude::Key>(&mut self) -> Option<&mut T::Value> {
+    pub fn retrieve_data_mut<T: crate::prelude::Key>(&mut self) -> Option<&mut T::Value>
+    where
+        T::Value: Send,
+    {
         self.data_map.get_mut::<T>()
     }
 }
