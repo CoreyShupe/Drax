@@ -1,7 +1,7 @@
 use drax::link;
 use drax::transport::buffered_writer::{FrameSizeAppender, GenericWriter};
 use drax::transport::frame::FrameEncoder;
-use drax::transport::pipeline::{link, ChainProcessor};
+use drax::transport::pipeline::ChainProcessor;
 use drax::transport::DraxTransport;
 use drax::VarInt;
 use std::io::Cursor;
