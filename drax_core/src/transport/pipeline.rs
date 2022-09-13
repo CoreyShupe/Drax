@@ -4,9 +4,9 @@ pub trait ChainProcessor {
     type Input;
     type Output;
 
-    fn process(
-        &mut self,
-        context: &mut TransportProcessorContext,
+    fn process<'a>(
+        &'a mut self,
+        context: &'a mut TransportProcessorContext,
         input: Self::Input,
     ) -> super::Result<Self::Output>;
 }
