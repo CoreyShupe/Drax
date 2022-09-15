@@ -72,10 +72,6 @@ where
                 buf.filled().len()
             };
 
-            if n > 0 {
-                println!("Read {} bytes", n);
-            }
-
             // Safety: This is guaranteed to be the number of initialized (and read)
             // bytes due to the invariants provided by `ReadBuf::filled`.
             unsafe {
