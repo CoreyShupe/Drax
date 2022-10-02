@@ -464,7 +464,7 @@ pub(crate) fn create_type_sizer(
             }
         }
         RawType::Primitive => {
-            quote::quote!(size += drax::transport::DraxTransport::precondition_size(&#ident, context)?;)
+            quote::quote!(size += drax::transport::DraxTransport::precondition_size(*#ident, context)?;)
         }
         RawType::String => match sheet.serial_type.custom_size() {
             None => {
