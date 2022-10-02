@@ -8,7 +8,7 @@ use syn::Fields;
 pub struct DraxField {
     pub(crate) field_ident: Ident,
     sheet: TypeAttributeSheet,
-    type_ref: RawType,
+    pub(crate) type_ref: RawType,
 }
 
 impl DraxField {

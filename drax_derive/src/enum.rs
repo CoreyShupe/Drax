@@ -72,7 +72,17 @@ impl DraxVariant {
         let ser = self
             .fields
             .iter()
-            .map(|x| x.ser())
+            .map(|x| match x.type_ref {
+                RawType::Primitive => {
+                    let ident = &x.field_ident;
+                    let ser = x.ser();
+                    quote::quote! {
+                        let #ident = *#ident;
+                        #ser
+                    }
+                }
+                _ => x.ser(),
+            })
             .collect::<Vec<TokenStream>>();
 
         let arm = self.arm();
@@ -121,7 +131,17 @@ impl DraxVariant {
         let sizer = self
             .fields
             .iter()
-            .map(|x| x.size())
+            .map(|x| match x.type_ref {
+                RawType::Primitive => {
+                    let ident = &x.field_ident;
+                    let sizer = x.size();
+                    quote::quote! {
+                        let #ident = *#ident;
+                        #sizer
+                    }
+                }
+                _ => x.size(),
+            })
             .collect::<Vec<TokenStream>>();
 
         let arm = self.arm();
