@@ -337,18 +337,33 @@ pub(crate) fn create_type_ser(
         RawType::VarLong => {
             quote::quote!(drax::extension::write_var_long_sync(#ident, context, writer)?;)
         }
-        RawType::SizedVec(inner) => {
-            let next_ident = Ident::new("next", Span::call_site());
-            let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
-            quote::quote! {
-                {
-                    drax::extension::write_var_int_sync(#ident.len().try_into()?, context, writer)?;
-                    for #next_ident in #ident {
-                        #inner_type_ser
+        RawType::SizedVec(inner) => match **inner {
+            RawType::Primitive => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        drax::extension::write_var_int_sync(#ident.len().try_into()?, context, writer)?;
+                        for #next_ident in #ident {
+                            let #next_ident = *#next_ident;
+                            #inner_type_ser
+                        }
                     }
                 }
             }
-        }
+            _ => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        drax::extension::write_var_int_sync(#ident.len().try_into()?, context, writer)?;
+                        for #next_ident in #ident {
+                            #inner_type_ser
+                        }
+                    }
+                }
+            }
+        },
         RawType::Maybe(inner) => {
             let next_ident = Ident::new("next", Span::call_site());
             let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
@@ -361,17 +376,31 @@ pub(crate) fn create_type_ser(
                 }
             }
         }
-        RawType::Vec(inner) => {
-            let next_ident = Ident::new("next", Span::call_site());
-            let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
-            quote::quote! {
-                {
-                    for #next_ident in #ident {
-                        #inner_type_ser
+        RawType::Vec(inner) => match **inner {
+            RawType::Primitive => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        for #next_ident in #ident {
+                            let #next_ident = *#next_ident;
+                            #inner_type_ser
+                        }
                     }
                 }
             }
-        }
+            _ => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        for #next_ident in #ident {
+                            #inner_type_ser
+                        }
+                    }
+                }
+            }
+        },
         RawType::Option(inner) => {
             let next_ident = Ident::new("next", Span::call_site());
             let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
@@ -384,7 +413,7 @@ pub(crate) fn create_type_ser(
             }
         }
         RawType::Primitive => {
-            quote::quote!(drax::transport::DraxTransport::write_to_transport(*#ident, context, writer)?;)
+            quote::quote!(drax::transport::DraxTransport::write_to_transport(&#ident, context, writer)?;)
         }
         RawType::String => match sheet.serial_type.custom_ser() {
             None => {
@@ -417,18 +446,33 @@ pub(crate) fn create_type_sizer(
         RawType::VarLong => {
             quote::quote!(size += drax::extension::size_var_long(#ident, context)?;)
         }
-        RawType::SizedVec(inner) => {
-            let next_ident = Ident::new("next", Span::call_site());
-            let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
-            quote::quote! {
-                {
-                    size += drax::extension::size_var_int(#ident.len().try_into()?, context)?;
-                    for #next_ident in #ident {
-                        #inner_type_sizer
+        RawType::SizedVec(inner) => match **inner {
+            RawType::Primitive => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        size += drax::extension::size_var_int(#ident.len().try_into()?, context)?;
+                        for #next_ident in #ident {
+                            let #next_ident = *#next_ident;
+                            #inner_type_sizer
+                        }
                     }
                 }
             }
-        }
+            _ => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        size += drax::extension::size_var_int(#ident.len().try_into()?, context)?;
+                        for #next_ident in #ident {
+                            #inner_type_sizer
+                        }
+                    }
+                }
+            }
+        },
         RawType::Maybe(inner) => {
             let next_ident = Ident::new("next", Span::call_site());
             let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
@@ -441,17 +485,31 @@ pub(crate) fn create_type_sizer(
                 }
             }
         }
-        RawType::Vec(inner) => {
-            let next_ident = Ident::new("next", Span::call_site());
-            let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
-            quote::quote! {
-                {
-                    for #next_ident in #ident {
-                        #inner_type_sizer
+        RawType::Vec(inner) => match **inner {
+            RawType::Primitive => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        for #next_ident in #ident {
+                            let #next_ident = *#next_ident;
+                            #inner_type_sizer
+                        }
                     }
                 }
             }
-        }
+            _ => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        for #next_ident in #ident {
+                            #inner_type_sizer
+                        }
+                    }
+                }
+            }
+        },
         RawType::Option(inner) => {
             let next_ident = Ident::new("next", Span::call_site());
             let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
@@ -464,7 +522,7 @@ pub(crate) fn create_type_sizer(
             }
         }
         RawType::Primitive => {
-            quote::quote!(size += drax::transport::DraxTransport::precondition_size(*#ident, context)?;)
+            quote::quote!(size += drax::transport::DraxTransport::precondition_size(&#ident, context)?;)
         }
         RawType::String => match sheet.serial_type.custom_size() {
             None => {
