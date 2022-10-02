@@ -384,7 +384,7 @@ pub(crate) fn create_type_ser(
             }
         }
         RawType::Primitive => {
-            quote::quote!(drax::transport::DraxTransport::write_to_transport(&#ident, context, writer)?;)
+            quote::quote!(drax::transport::DraxTransport::write_to_transport(*#ident, context, writer)?;)
         }
         RawType::String => match sheet.serial_type.custom_ser() {
             None => {
