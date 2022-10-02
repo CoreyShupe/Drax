@@ -224,3 +224,36 @@ where
     let json_string = read_string::<R>(max_length, context, reader)?;
     Ok(serde_json::from_slice(json_string.as_bytes())?)
 }
+
+impl crate::transport::DraxTransport for uuid::Uuid {
+    fn write_to_transport(
+        &self,
+        context: &mut TransportProcessorContext,
+        writer: &mut Vec<u8>,
+    ) -> Result<()> {
+        let (most_significant, least_significant) = self.as_u64_pair();
+        u64::write_to_transport(&most_significant, context, writer)?;
+        u64::write_to_transport(&least_significant, context, writer)
+    }
+
+    fn read_from_transport<R: Read>(
+        context: &mut TransportProcessorContext,
+        read: &mut R,
+    ) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let (most_significant, least_significant) = (
+            u64::read_from_transport(context, read)?,
+            u64::read_from_transport(context, read)?,
+        );
+        Ok(uuid::Uuid::from_u64_pair(
+            most_significant,
+            least_significant,
+        ))
+    }
+
+    fn precondition_size(&self, _: &mut TransportProcessorContext) -> Result<usize> {
+        Ok(16)
+    }
+}
