@@ -537,7 +537,7 @@ pub(crate) fn create_type_de(
                     let mut full_read = Vec::new();
                     reader.read_to_end(&mut full_read)?;
                     let len = #ident.len();
-                    let mut cursor = Cursor::new(full_read);
+                    let mut cursor = std::io::Cursor::new(full_read);
 
                     while cursor.position() as usize != len {
                         let #next_ident = {
