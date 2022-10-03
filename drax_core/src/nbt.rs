@@ -3,11 +3,8 @@ use std::{
     io::{Read, Write},
 };
 
+use crate::transport::{Error, Result};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use drax::transport::Error;
-
-pub mod read_util;
-pub mod write_util;
 
 pub struct NbtAccounter {
     limit: u64,
@@ -15,19 +12,19 @@ pub struct NbtAccounter {
 }
 
 impl NbtAccounter {
-    fn account_bits(&mut self, bits: u64) -> drax::transport::Result<()> {
+    fn account_bits(&mut self, bits: u64) -> Result<()> {
         match self.current.checked_add(bits) {
             Some(next) => {
                 if next > self.limit {
-                    return drax::transport::Error::cause(format!(
-                            "Nbt tag too big, read {} bytes of allowed {}.",
-                    next, self.limit
+                    return Error::cause(format!(
+                        "Nbt tag too big, read {} bytes of allowed {}.",
+                        next, self.limit
                     ));
                 }
                 self.current = next;
                 Ok(())
             }
-            None => drax::transport::Error::cause("Overflowed bits in accounter."),
+            None => Error::cause("Overflowed bits in accounter."),
         }
     }
 }
@@ -68,19 +65,19 @@ impl Tag {
     }
 }
 
-fn skip_bytes<R: Read, I: Into<u64>>(read: &mut R, i: I) -> drax::transport::Result<()> {
+fn skip_bytes<R: Read, I: Into<u64>>(read: &mut R, i: I) -> Result<()> {
     std::io::copy(&mut read.take(i.into()), &mut std::io::sink())
-    .map_err(Error::TokioError)
-    .map(|_| ())
+        .map_err(Error::TokioError)
+        .map(|_| ())
 }
 
-fn skip_string<R: Read>(read: &mut R) -> drax::transport::Result<()> {
+fn skip_string<R: Read>(read: &mut R) -> Result<()> {
     let skipped = read.read_u16::<BigEndian>().map_err(Error::TokioError)?;
     skip_bytes(read, skipped)?;
     Ok(())
 }
 
-fn read_string<R: Read>(read: &mut R) -> drax::transport::Result<String> {
+fn read_string<R: Read>(read: &mut R) -> Result<String> {
     let str_len = read.read_u16::<BigEndian>().map_err(Error::TokioError)?;
     if str_len == 0 {
         return Ok(format!(""));
@@ -89,51 +86,51 @@ fn read_string<R: Read>(read: &mut R) -> drax::transport::Result<String> {
     let mut bytes_read = 0;
     while bytes_read < bytes.len() {
         match read
-        .read(&mut bytes[bytes_read..])
-        .map_err(Error::TokioError)?
+            .read(&mut bytes[bytes_read..])
+            .map_err(Error::TokioError)?
         {
             0 => return Error::cause("Invalid NBT string, under read."),
             n => bytes_read += n,
         }
     }
     cesu8::from_java_cesu8(&mut bytes)
-    .map_err(|err| Error::Unknown(Some(format!("Cesu8 encoding error: {}", err))))
-    .map(|cow| cow.to_string())
+        .map_err(|err| Error::Unknown(Some(format!("Cesu8 encoding error: {}", err))))
+        .map(|cow| cow.to_string())
 }
 
-fn write_string<W: Write>(write: &mut W, string: &String) -> drax::transport::Result<()> {
+fn write_string<W: Write>(write: &mut W, string: &String) -> Result<()> {
     write
-    .write_u16::<BigEndian>(string.len() as u16)
-    .map_err(Error::TokioError)?;
+        .write_u16::<BigEndian>(string.len() as u16)
+        .map_err(Error::TokioError)?;
     write
-    .write_all(&cesu8::to_java_cesu8(string))
-    .map_err(Error::TokioError)?;
+        .write_all(&cesu8::to_java_cesu8(string))
+        .map_err(Error::TokioError)?;
     Ok(())
 }
 
-fn write_tag<W: Write>(tag: &Tag, write: &mut W) -> drax::transport::Result<()> {
+fn write_tag<W: Write>(tag: &Tag, write: &mut W) -> Result<()> {
     match tag {
         Tag::EndTag => Ok(()),
         Tag::ByteTag(byte) => write.write_u8(*byte).map_err(Error::TokioError),
         Tag::ShortTag(short) => write
-        .write_i16::<BigEndian>(*short)
-        .map_err(Error::TokioError),
+            .write_i16::<BigEndian>(*short)
+            .map_err(Error::TokioError),
         Tag::IntTag(int) => write
-        .write_i32::<BigEndian>(*int)
-        .map_err(Error::TokioError),
+            .write_i32::<BigEndian>(*int)
+            .map_err(Error::TokioError),
         Tag::LongTag(long) => write
-        .write_i64::<BigEndian>(*long)
-        .map_err(Error::TokioError),
+            .write_i64::<BigEndian>(*long)
+            .map_err(Error::TokioError),
         Tag::FloatTag(float) => write
-        .write_f32::<BigEndian>(*float)
-        .map_err(Error::TokioError),
+            .write_f32::<BigEndian>(*float)
+            .map_err(Error::TokioError),
         Tag::DoubleTag(double) => write
-        .write_f64::<BigEndian>(*double)
-        .map_err(Error::TokioError),
+            .write_f64::<BigEndian>(*double)
+            .map_err(Error::TokioError),
         Tag::ByteArrayTag(b_arr) => {
             write
-            .write_i32::<BigEndian>(b_arr.len() as i32)
-            .map_err(Error::TokioError)?;
+                .write_i32::<BigEndian>(b_arr.len() as i32)
+                .map_err(Error::TokioError)?;
             write.write_all(b_arr).map_err(Error::TokioError)?;
             Ok(())
         }
@@ -141,8 +138,8 @@ fn write_tag<W: Write>(tag: &Tag, write: &mut W) -> drax::transport::Result<()> 
         Tag::ListTag(tag_type, tags) => {
             write.write_u8(*tag_type).map_err(Error::TokioError)?;
             write
-            .write_i32::<BigEndian>(tags.len() as i32)
-            .map_err(Error::TokioError)?;
+                .write_i32::<BigEndian>(tags.len() as i32)
+                .map_err(Error::TokioError)?;
             for tag in tags {
                 write_tag(tag, write)?;
             }
@@ -162,23 +159,23 @@ fn write_tag<W: Write>(tag: &Tag, write: &mut W) -> drax::transport::Result<()> 
         }
         Tag::IntArrayTag(i_arr) => {
             write
-            .write_i32::<BigEndian>(i_arr.len() as i32)
-            .map_err(Error::TokioError)?;
+                .write_i32::<BigEndian>(i_arr.len() as i32)
+                .map_err(Error::TokioError)?;
             for i in i_arr {
                 write
-                .write_i32::<BigEndian>(*i)
-                .map_err(Error::TokioError)?;
+                    .write_i32::<BigEndian>(*i)
+                    .map_err(Error::TokioError)?;
             }
             Ok(())
         }
         Tag::LongArrayTag(l_arr) => {
             write
-            .write_i32::<BigEndian>(l_arr.len() as i32)
-            .map_err(Error::TokioError)?;
+                .write_i32::<BigEndian>(l_arr.len() as i32)
+                .map_err(Error::TokioError)?;
             for l in l_arr {
                 write
-                .write_i64::<BigEndian>(*l)
-                .map_err(Error::TokioError)?;
+                    .write_i64::<BigEndian>(*l)
+                    .map_err(Error::TokioError)?;
             }
             Ok(())
         }
@@ -186,11 +183,11 @@ fn write_tag<W: Write>(tag: &Tag, write: &mut W) -> drax::transport::Result<()> 
 }
 
 fn load_tag<R: Read>(
-        tag_bit: u8,
-        read: &mut R,
-        depth: usize,
-        accounter: &mut NbtAccounter,
-        ) -> drax::transport::Result<Tag> {
+    tag_bit: u8,
+    read: &mut R,
+    depth: usize,
+    accounter: &mut NbtAccounter,
+) -> Result<Tag> {
     match tag_bit {
         0 => {
             accounter.account_bits(64)?;
@@ -203,31 +200,31 @@ fn load_tag<R: Read>(
         2 => {
             accounter.account_bits(80)?;
             Ok(Tag::ShortTag(
-                    read.read_i16::<BigEndian>().map_err(Error::TokioError)?,
+                read.read_i16::<BigEndian>().map_err(Error::TokioError)?,
             ))
         }
         3 => {
             accounter.account_bits(96)?;
             Ok(Tag::IntTag(
-                    read.read_i32::<BigEndian>().map_err(Error::TokioError)?,
+                read.read_i32::<BigEndian>().map_err(Error::TokioError)?,
             ))
         }
         4 => {
             accounter.account_bits(128)?;
             Ok(Tag::LongTag(
-                    read.read_i64::<BigEndian>().map_err(Error::TokioError)?,
+                read.read_i64::<BigEndian>().map_err(Error::TokioError)?,
             ))
         }
         5 => {
             accounter.account_bits(96)?;
             Ok(Tag::FloatTag(
-                    read.read_f32::<BigEndian>().map_err(Error::TokioError)?,
+                read.read_f32::<BigEndian>().map_err(Error::TokioError)?,
             ))
         }
         6 => {
             accounter.account_bits(128)?;
             Ok(Tag::DoubleTag(
-                    read.read_f64::<BigEndian>().map_err(Error::TokioError)?,
+                read.read_f64::<BigEndian>().map_err(Error::TokioError)?,
             ))
         }
         7 => {
