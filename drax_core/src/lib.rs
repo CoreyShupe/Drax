@@ -27,6 +27,7 @@ pub mod extension;
 pub mod prelude;
 pub mod primitives;
 pub mod transport;
+pub mod nbt;
 
 // stub types
 pub type VarInt = i32;
