@@ -51,7 +51,7 @@ impl DraxTransport for bool {
         _context: &mut TransportProcessorContext,
         writer: &mut Vec<u8>,
     ) -> crate::transport::Result<()> {
-        writer.write_all(&[if *self { 0x1 } else { 0x0 }])?;
+        writer.write_all(&[u8::from(*self)])?;
         Ok(())
     }
 

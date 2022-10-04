@@ -100,9 +100,9 @@ pub struct FrameDecoder {
 #[cfg(feature = "compression")]
 impl Default for FrameDecoder {
     fn default() -> Self {
-        return Self {
+        Self {
             compression_threshold: -1,
-        };
+        }
     }
 }
 

@@ -23,41 +23,36 @@ macro_rules! match_comma {
 pub(crate) enum SerialType {
     Raw(Option<Literal>),
     Json(Literal),
-    Nbt,
 }
 
 impl SerialType {
     pub fn custom_ser(&self) -> Option<(TokenStream, TokenStream)> {
         match self {
-            SerialType::Raw(next) => match next {
-                None => None,
-                Some(literal) => Some((
+            SerialType::Raw(next) => next.as_ref().map(|literal| {
+                (
                     quote::quote!(drax::extension::write_string),
                     quote::quote!(#literal),
-                )),
-            },
+                )
+            }),
             SerialType::Json(literal) => Some((
                 quote::quote!(drax::extension::write_json),
                 quote::quote!(#literal),
             )),
-            SerialType::Nbt => unimplemented!(),
         }
     }
 
     pub fn custom_de(&self) -> Option<(TokenStream, TokenStream)> {
         match self {
-            SerialType::Raw(next) => match next {
-                None => None,
-                Some(literal) => Some((
+            SerialType::Raw(next) => next.as_ref().map(|literal| {
+                (
                     quote::quote!(drax::extension::read_string),
                     quote::quote!(#literal),
-                )),
-            },
+                )
+            }),
             SerialType::Json(literal) => Some((
                 quote::quote!(drax::extension::read_json),
                 quote::quote!(#literal),
             )),
-            SerialType::Nbt => unimplemented!(),
         }
     }
 
@@ -65,7 +60,6 @@ impl SerialType {
         match self {
             SerialType::Raw(_) => None,
             SerialType::Json(_) => Some(quote::quote!(drax::extension::size_json)),
-            SerialType::Nbt => unimplemented!(),
         }
     }
 }
@@ -94,7 +88,7 @@ fn parse_next_literal(args: &mut IntoIter) -> Literal {
     assert_next_punct(args, '=');
     let next = args.next().expect("Value not associated with arg.");
     if let TokenTree::Literal(literal) = next {
-        literal.clone()
+        literal
     } else {
         panic!("Did not find a group following the = in an arg def.");
     }
@@ -120,8 +114,8 @@ fn parse_include_statement(args: &mut IntoIter) -> IncludeStatement {
         panic!("Did not find an ident following the as in an include def.");
     };
     IncludeStatement {
-        key_ty: TokenStream::from(TokenTree::from(key_ty.clone())),
-        value_name: value_name.clone(),
+        key_ty: TokenStream::from(TokenTree::from(key_ty)),
+        value_name,
     }
 }
 
@@ -217,13 +211,6 @@ impl TypeAttributeSheet {
                             panic!("Serial type defined twice.");
                         }
                     }
-                    "nbt" => {
-                        if let SerialType::Raw(None) = self.serial_type {
-                            self.serial_type = SerialType::Nbt;
-                        } else {
-                            panic!("Serial type defined twice.");
-                        }
-                    }
                     "json" => {
                         if let SerialType::Raw(None) = self.serial_type {
                             self.serial_type = SerialType::Json(parse_next_literal(&mut args));
@@ -264,6 +251,8 @@ pub(crate) enum RawType {
     Primitive,
     String,
     UnknownObjectType,
+    Tag,
+    OptionalTag,
 }
 
 impl RawType {
@@ -274,6 +263,7 @@ impl RawType {
                     "char" => panic!("Chars are currently not encodable."),
                     "VarInt" => return RawType::VarInt,
                     "VarLong" => return RawType::VarLong,
+                    "CompoundTag" => return RawType::Tag,
                     "SizedVec" => {
                         assert_next_punct(&mut stream, '<');
                         return RawType::SizedVec(Box::new(Self::from_token_stream(stream)));
@@ -288,7 +278,11 @@ impl RawType {
                     }
                     "Option" => {
                         assert_next_punct(&mut stream, '<');
-                        return RawType::Option(Box::new(Self::from_token_stream(stream)));
+                        let inner = Self::from_token_stream(stream);
+                        if matches!(inner, RawType::Tag) {
+                            return RawType::OptionalTag;
+                        }
+                        return RawType::Option(Box::new(inner));
                     }
                     "bool" | "u8" | "i8" | "u16" | "i16" | "u32" | "i32" | "u64" | "i64"
                     | "u128" | "i128" | "f32" | "f64" => return RawType::Primitive,
@@ -303,7 +297,7 @@ impl RawType {
                 _ => panic!("Unsupported token during type definition."),
             }
         }
-        return RawType::UnknownObjectType;
+        RawType::UnknownObjectType
     }
 
     pub(crate) fn normalize_type(syn_type: &Type) -> Self {
@@ -431,6 +425,8 @@ pub(crate) fn create_type_ser(
                 quote::quote!(#custom(#follower, #ident, context, writer)?;)
             }
         },
+        RawType::Tag => quote::quote!(drax::nbt::write_nbt(#ident)?;),
+        RawType::OptionalTag => quote::quote!(drax::nbt::write_optional_nbt(#ident)?;),
     }
 }
 
@@ -540,6 +536,8 @@ pub(crate) fn create_type_sizer(
                 quote::quote!(size += #custom(#ident, context)?;)
             }
         },
+        RawType::Tag => quote::quote!(size += drax::nbt::size_nbt(#ident);),
+        RawType::OptionalTag => quote::quote!(size += drax::nbt::size_optional_nbt(#ident);),
     }
 }
 
@@ -636,6 +634,32 @@ pub(crate) fn create_type_de(
             Some((custom, follower)) => {
                 quote::quote!(#custom(#follower, context, reader)?)
             }
+        },
+        RawType::Tag => match sheet.serial_type.custom_de() {
+            Some((_, lim)) => {
+                quote::quote! {
+                    {
+                        match drax::nbt::read_nbt(reader, #lim)? {
+                            Some(tag) => tag,
+                            None => return drax::transport::Error::cause("Invalid empty tag when tag expected."),
+                        }
+                    }
+                }
+            }
+            None => {
+                quote::quote! {
+                    {
+                        match drax::nbt::read_nbt(reader, 0x200000L)? {
+                            Some(tag) => tag,
+                            None => return drax::transport::Error::cause("Invalid empty tag when tag expected."),
+                        }
+                    }
+                }
+            }
+        },
+        RawType::OptionalTag => match sheet.serial_type.custom_de() {
+            Some((_, lim)) => quote::quote!(drax::nbt::read_nbt(reader, #lim)?),
+            None => quote::quote!(drax::nbt::read_nbt(reader, 0x200000L)?),
         },
     }
 }

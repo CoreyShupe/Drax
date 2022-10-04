@@ -20,14 +20,10 @@ impl DraxVariant {
     pub fn from_variant(variant: &Variant, ordinal: usize, key_type: RawType) -> Self {
         let fields = &variant.fields;
         let sheet = StructAttributeSheet::create_sheet(&variant.attrs);
-        let defined_key = sheet
-            .enum_key
-            .as_ref()
-            .map(|x| x.clone())
-            .unwrap_or_else(|| {
-                let idx = syn::Index::from(ordinal);
-                quote::quote!(#idx)
-            });
+        let defined_key = sheet.enum_key.as_ref().cloned().unwrap_or_else(|| {
+            let idx = syn::Index::from(ordinal);
+            quote::quote!(#idx)
+        });
         Self {
             variant_ident: variant.ident.clone(),
             fields: super::fields::from_fields(fields),
@@ -40,19 +36,18 @@ impl DraxVariant {
 
     fn spec_creator(&self) -> TokenStream {
         let inner_ident = self.variant_ident.clone();
-        if self.fields.len() == 0 {
+        if self.fields.is_empty() {
             return quote::quote!(Self::#inner_ident);
         }
         let creator_group: TokenStream = self
             .fields
             .iter()
-            .map(|field| {
-                let mut v: Vec<TokenTree> = Vec::with_capacity(2);
-                v.push(TokenTree::from(field.field_ident.clone()));
-                v.push(TokenTree::from(Punct::new(',', Spacing::Alone)));
-                v
+            .flat_map(|field| {
+                vec![
+                    TokenTree::from(field.field_ident.clone()),
+                    TokenTree::from(Punct::new(',', Spacing::Alone)),
+                ]
             })
-            .flatten()
             .collect();
         let creator = if self.named_fields {
             Group::new(Delimiter::Brace, creator_group)
@@ -89,7 +84,7 @@ impl DraxVariant {
         let key_ser = if ser_key {
             let key_ident = Ident::new("key", Span::call_site());
             let key_type = &self.key_type;
-            let ref_ser = create_type_ser(&key_ident, &key_type, &TypeAttributeSheet::default());
+            let ref_ser = create_type_ser(&key_ident, key_type, &TypeAttributeSheet::default());
             let key_out = &self.defined_key;
             quote::quote! {
                 {

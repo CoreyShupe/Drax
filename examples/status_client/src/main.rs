@@ -119,13 +119,13 @@ pub async fn main() -> anyhow::Result<()> {
         }),
         ServerBoundStatusPacket::StatusRequest(StatusRequest),
     );
-    let mut starter = [
+    let starter = [
         write_pipeline.process(&mut context, Box::new(handshake))?,
         write_pipeline.process(&mut context, Box::new(status_req))?,
     ]
     .concat();
 
-    write.write_all(&mut starter).await?; // handshake + status req has been sent, now we wait for a status response
+    write.write_all(&starter).await?; // handshake + status req has been sent, now we wait for a status response
 
     let status_response = drax_transport_pipeline
         .read_transport_packet(&mut context, &mut read)
@@ -143,8 +143,8 @@ pub async fn main() -> anyhow::Result<()> {
             .duration_since(std::time::SystemTime::UNIX_EPOCH)?
             .as_millis() as i64,
     });
-    let mut ping_data = write_pipeline.process(&mut context, Box::new(ping))?;
-    write.write_all(&mut ping_data).await?;
+    let ping_data = write_pipeline.process(&mut context, Box::new(ping))?;
+    write.write_all(&ping_data).await?;
 
     let status_response = drax_transport_pipeline
         .read_transport_packet(&mut context, &mut read)

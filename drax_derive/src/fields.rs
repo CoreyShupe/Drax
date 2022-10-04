@@ -50,7 +50,7 @@ impl DraxField {
                     .sheet
                     .default
                     .as_ref()
-                    .map(|x| x.clone())
+                    .cloned()
                     .unwrap_or_else(|| quote::quote!(Default::default()));
                 quote::quote! {
                     let #ident = if !{ #skip_req } {
@@ -74,9 +74,9 @@ pub fn from_fields(fields: &Fields) -> Vec<DraxField> {
             .named
             .iter()
             .map(|field| {
-                let ident = field.ident.as_ref().map(|x| x.clone()).unwrap();
+                let ident = field.ident.as_ref().cloned().unwrap();
                 DraxField {
-                    field_ident: ident.clone(),
+                    field_ident: ident,
                     sheet: TypeAttributeSheet::create_sheet(&field.attrs),
                     type_ref: RawType::normalize_type(&field.ty),
                 }
@@ -89,12 +89,12 @@ pub fn from_fields(fields: &Fields) -> Vec<DraxField> {
             .map(|(index, field)| {
                 let ident = Ident::new(&format!("__v{}", index), Span::call_site());
                 DraxField {
-                    field_ident: ident.clone(),
+                    field_ident: ident,
                     sheet: TypeAttributeSheet::create_sheet(&field.attrs),
                     type_ref: RawType::normalize_type(&field.ty),
                 }
             })
             .collect(),
-        Fields::Unit => return Vec::new(),
+        Fields::Unit => Vec::new(),
     }
 }

@@ -6,6 +6,8 @@ use std::{
 use crate::transport::{Error, Result};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
+pub const COMPOUND_TAG_BIT: u8 = 10;
+
 pub struct NbtAccounter {
     limit: u64,
     current: u64,
@@ -58,7 +60,7 @@ impl Tag {
             Tag::ByteArrayTag(_) => 7,
             Tag::StringTag(_) => 8,
             Tag::ListTag(_, _) => 9,
-            Tag::CompoundTag(_) => 10,
+            Tag::CompoundTag(_) => COMPOUND_TAG_BIT,
             Tag::IntArrayTag(_) => 11,
             Tag::LongArrayTag(_) => 12,
         }
@@ -80,7 +82,7 @@ fn skip_string<R: Read>(read: &mut R) -> Result<()> {
 fn read_string<R: Read>(read: &mut R) -> Result<String> {
     let str_len = read.read_u16::<BigEndian>().map_err(Error::TokioError)?;
     if str_len == 0 {
-        return Ok(format!(""));
+        return Ok(String::new());
     }
     let mut bytes = vec![0u8; str_len as usize];
     let mut bytes_read = 0;
@@ -93,9 +95,13 @@ fn read_string<R: Read>(read: &mut R) -> Result<String> {
             n => bytes_read += n,
         }
     }
-    cesu8::from_java_cesu8(&mut bytes)
+    cesu8::from_java_cesu8(&bytes)
         .map_err(|err| Error::Unknown(Some(format!("Cesu8 encoding error: {}", err))))
         .map(|cow| cow.to_string())
+}
+
+fn size_string(string: &str) -> usize {
+    4 + cesu8::to_java_cesu8(string).len()
 }
 
 fn write_string<W: Write>(write: &mut W, string: &String) -> Result<()> {
@@ -106,6 +112,32 @@ fn write_string<W: Write>(write: &mut W, string: &String) -> Result<()> {
         .write_all(&cesu8::to_java_cesu8(string))
         .map_err(Error::TokioError)?;
     Ok(())
+}
+
+fn write_compound_tag<W: Write>(tag: &CompoundTag, write: &mut W) -> Result<()> {
+    for (key, value) in &tag.mappings {
+        let id = value.get_bit();
+        write.write_u8(id).map_err(Error::TokioError)?;
+        if id == 0 {
+            return Ok(());
+        }
+        write_string(write, key)?;
+        write_tag(value, write)?;
+    }
+    write.write_u8(0).map_err(Error::TokioError)
+}
+
+fn size_compound_tag(tag: &CompoundTag) -> usize {
+    let mut size = 0;
+    for (key, value) in &tag.mappings {
+        let id = value.get_bit();
+        if id == 0 {
+            return size + 1;
+        }
+        size += 1 + size_string(key);
+        size += size_tag(value);
+    }
+    size + 1
 }
 
 fn write_tag<W: Write>(tag: &Tag, write: &mut W) -> Result<()> {
@@ -145,18 +177,7 @@ fn write_tag<W: Write>(tag: &Tag, write: &mut W) -> Result<()> {
             }
             Ok(())
         }
-        Tag::CompoundTag(tag) => {
-            for (key, value) in &tag.mappings {
-                let id = value.get_bit();
-                write.write_u8(id).map_err(Error::TokioError)?;
-                if id == 0 {
-                    return Ok(());
-                }
-                write_string(write, key)?;
-                write_tag(value, write)?;
-            }
-            write.write_u8(0).map_err(Error::TokioError)
-        }
+        Tag::CompoundTag(tag) => write_compound_tag(tag, write),
         Tag::IntArrayTag(i_arr) => {
             write
                 .write_i32::<BigEndian>(i_arr.len() as i32)
@@ -179,6 +200,30 @@ fn write_tag<W: Write>(tag: &Tag, write: &mut W) -> Result<()> {
             }
             Ok(())
         }
+    }
+}
+
+fn size_tag(tag: &Tag) -> usize {
+    match tag {
+        Tag::EndTag => 0,
+        Tag::ByteTag(_) => 1,
+        Tag::ShortTag(_) => 2,
+        Tag::IntTag(_) => 4,
+        Tag::LongTag(_) => 8,
+        Tag::FloatTag(_) => 4,
+        Tag::DoubleTag(_) => 8,
+        Tag::ByteArrayTag(b_arr) => b_arr.len() + 4,
+        Tag::StringTag(string) => size_string(string),
+        Tag::ListTag(_, tags) => {
+            let mut size = 5;
+            for tag in tags {
+                size += size_tag(tag);
+            }
+            size
+        }
+        Tag::CompoundTag(tag) => size_compound_tag(tag),
+        Tag::IntArrayTag(i_arr) => (i_arr.len() * 4) + 4,
+        Tag::LongArrayTag(l_arr) => (l_arr.len() * 8) + 4,
     }
 }
 
@@ -320,4 +365,52 @@ impl CompoundTag {
     }
 }
 
-// read handles, tbh we should only really allow CompoundTag as a type
+pub fn read_nbt<R: Read>(
+    read: &mut R,
+    limit: u64,
+) -> crate::transport::Result<Option<CompoundTag>> {
+    let mut accounter = NbtAccounter { limit, current: 0 };
+    let bit = read.read_u8().map_err(Error::TokioError)?;
+    if bit == 0 {
+        return Ok(None);
+    } else if bit != COMPOUND_TAG_BIT {
+        return Error::cause("Root tag must be a compound tag.");
+    }
+    skip_string(read)?;
+    match load_tag(bit, read, 0, &mut accounter)? {
+        Tag::CompoundTag(tag) => Ok(Some(tag)),
+        _ => Error::cause("Invalid root tag loaded."),
+    }
+}
+
+pub fn write_nbt<W: Write>(tag: &CompoundTag, writer: &mut W) -> Result<()> {
+    writer
+        .write_u8(COMPOUND_TAG_BIT)
+        .map_err(Error::TokioError)?;
+    write_string(writer, &String::new())?;
+    write_compound_tag(tag, writer)
+}
+
+pub fn write_optional_nbt<W: Write>(tag: &Option<CompoundTag>, writer: &mut W) -> Result<()> {
+    match tag.as_ref() {
+        Some(tag) => {
+            writer
+                .write_u8(COMPOUND_TAG_BIT)
+                .map_err(Error::TokioError)?;
+            write_string(writer, &String::new())?;
+            write_compound_tag(tag, writer)
+        }
+        None => writer.write_all(&[0u8]).map_err(Error::TokioError),
+    }
+}
+
+pub fn size_nbt(tag: &CompoundTag) -> usize {
+    size_compound_tag(tag)
+}
+
+pub fn size_optional_nbt(tag: &Option<CompoundTag>) -> usize {
+    match tag.as_ref() {
+        Some(tag) => size_compound_tag(tag),
+        None => 1,
+    }
+}
