@@ -21,7 +21,7 @@ pub fn link<T1, T2, T3>(
     }
 }
 
-pub type BoxedChain<T1, T2> = Box<dyn ChainProcessor<Input = T1, Output = T2> + Send + Sync>;
+pub type BoxedChain<T1, T2> = Box<dyn ChainProcessor<Input = T1, Output = T2>>;
 
 pub struct ProcessChainLink<T1, T2, T3> {
     process_chain_linkage: BoxedChain<T1, T2>,
