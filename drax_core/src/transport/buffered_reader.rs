@@ -1,3 +1,4 @@
+use crate::transport::pipeline::BoxedChain;
 use crate::transport::{Error, TransportProcessorContext};
 use bytes::{Buf, BufMut, BytesMut};
 use futures::ready;
@@ -9,7 +10,7 @@ use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, ReadBuf};
 
 pub struct DraxTransportPipeline<T2> {
-    pipeline: super::pipeline::BoxedChain<Vec<u8>, T2>,
+    pipeline: BoxedChain<Vec<u8>, T2>,
     buffer: BytesMut,
 }
 
@@ -29,6 +30,13 @@ impl<T2> DraxTransportPipeline<T2> {
             current_buffer: &mut self.buffer,
             reader,
             ready_size: None,
+        }
+    }
+
+    pub fn update_chain<NO>(self, chain: BoxedChain<Vec<u8>, NO>) -> DraxTransportPipeline<NO> {
+        Self {
+            pipeline: chain,
+            buffer: self.buffer,
         }
     }
 }
