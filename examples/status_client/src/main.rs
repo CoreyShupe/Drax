@@ -77,7 +77,7 @@ pub enum ClientBoundStatusPacket {
 }
 
 pub struct StatusResponseChainProcessor;
-impl drax::transport::pipeline::ChainProcessor for StatusResponseChainProcessor {
+impl ChainProcessor for StatusResponseChainProcessor {
     type Input = drax::transport::frame::PacketFrame;
     type Output = ClientBoundStatusPacket;
 
