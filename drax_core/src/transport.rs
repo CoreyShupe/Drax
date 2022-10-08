@@ -99,6 +99,10 @@ impl TransportProcessorContext {
         crate::extension::read_var_int(self, read).await
     }
 
+    pub fn clear_data(&mut self) {
+        self.data_map.clear()
+    }
+
     pub fn insert_data<T: crate::prelude::Key>(&mut self, item: T::Value)
     where
         <T as crate::prelude::Key>::Value: Send,
