@@ -1,4 +1,3 @@
-#![feature(generic_associated_types)]
 //! # Drax
 //!
 //! Drax is a library which supports framed packet reading and writing.
