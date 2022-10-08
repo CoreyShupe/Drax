@@ -99,8 +99,11 @@ impl TransportProcessorContext {
         crate::extension::read_var_int(self, read).await
     }
 
-    pub fn insert_data<T: crate::prelude::Key>(&mut self, item: T::Value) {
-        self.data_map.insert(item);
+    pub fn insert_data<T: crate::prelude::Key>(&mut self, item: T::Value)
+    where
+        <T as crate::prelude::Key>::Value: Send,
+    {
+        self.data_map.insert::<T>(item);
     }
 
     pub fn retrieve_data<T: crate::prelude::Key>(&self) -> Option<&T::Value>
