@@ -1,14 +1,14 @@
 use crate::transport::TransportProcessorContext;
 
 pub trait ChainProcessor {
-    type Input;
-    type Output;
+    type Input<'a>;
+    type Output<'a>;
 
     fn process<'a>(
         &'a mut self,
         context: &'a mut TransportProcessorContext,
-        input: Self::Input,
-    ) -> super::Result<Self::Output>;
+        input: Self::Input<'a>,
+    ) -> super::Result<Self::Output<'a>>;
 }
 
 pub fn link<T1, T2, T3>(
