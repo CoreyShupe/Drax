@@ -33,11 +33,8 @@ impl<T2> DraxTransportPipeline<T2> {
         }
     }
 
-    pub fn update_chain<NO>(self, chain: BoxedChain<Vec<u8>, NO>) -> DraxTransportPipeline<NO> {
-        DraxTransportPipeline::<NO> {
-            pipeline: chain,
-            buffer: self.buffer,
-        }
+    pub fn update_chain(&mut self, chain: BoxedChain<Vec<u8>, T2>) {
+        self.pipeline = chain;
     }
 }
 
