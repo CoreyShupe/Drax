@@ -391,7 +391,7 @@ pub fn expand_drax_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
             fn write_to_transport(
                 &self,
                 context: &mut drax::transport::TransportProcessorContext,
-                writer: &mut Vec<u8>,
+                writer: &mut std::io::Cursor<Vec<u8>>,
             ) -> drax::transport::Result<()> {
                 #(#includes)*
                 match self {

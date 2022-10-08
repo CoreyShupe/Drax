@@ -1,5 +1,5 @@
 use crate::transport::{DraxTransport, TransportProcessorContext};
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 
 macro_rules! define_primitive {
     ($prim_type:ty, $byte_count:literal) => {
@@ -7,7 +7,7 @@ macro_rules! define_primitive {
             fn write_to_transport(
                 &self,
                 _context: &mut TransportProcessorContext,
-                writer: &mut Vec<u8>,
+                writer: &mut std::io::Cursor<Vec<u8>>,
             ) -> crate::transport::Result<()> {
                 writer.write_all(&self.to_be_bytes())?;
                 Ok(())
@@ -49,7 +49,7 @@ impl DraxTransport for bool {
     fn write_to_transport(
         &self,
         _context: &mut TransportProcessorContext,
-        writer: &mut Vec<u8>,
+        writer: &mut Cursor<Vec<u8>>,
     ) -> crate::transport::Result<()> {
         writer.write_all(&[u8::from(*self)])?;
         Ok(())

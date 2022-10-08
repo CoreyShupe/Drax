@@ -26,7 +26,7 @@ pub fn expand_drax_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream
                 fn write_to_transport(
                     &self,
                     context: &mut drax::transport::TransportProcessorContext,
-                    writer: &mut Vec<u8>,
+                    writer: &mut std::io::Cursor<Vec<u8>>,
                 ) -> drax::transport::Result<()> {
                     Ok(())
                 }
@@ -77,7 +77,7 @@ pub fn expand_drax_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream
             fn write_to_transport(
                 &self,
                 context: &mut drax::transport::TransportProcessorContext,
-                writer: &mut Vec<u8>,
+                writer: &mut std::io::Cursor<Vec<u8>>,
             ) -> drax::transport::Result<()> {
                 #(#includes)*
                 #(#mappings)*

@@ -1,3 +1,5 @@
+use std::io::Cursor;
+
 pub struct FrameSizeAppender;
 impl super::pipeline::ChainProcessor for FrameSizeAppender {
     type Input = Vec<u8>;
@@ -28,10 +30,10 @@ impl super::pipeline::ChainProcessor for GenericWriter {
     where
         Self::Input: Sized,
     {
-        let mut packet_buffer = Vec::with_capacity(input.precondition_size(context)?);
+        let mut packet_buffer = Cursor::new(Vec::with_capacity(input.precondition_size(context)?));
         input.write_to_transport(context, &mut packet_buffer)?;
         Ok(super::frame::PacketFrame {
-            data: packet_buffer,
+            data: packet_buffer.into_inner(),
         })
     }
 }

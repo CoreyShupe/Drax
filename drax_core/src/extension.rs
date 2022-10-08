@@ -1,5 +1,5 @@
 use crate::transport::{Error, Result, TransportProcessorContext};
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 macro_rules! read_var_number {
@@ -229,7 +229,7 @@ impl crate::transport::DraxTransport for uuid::Uuid {
     fn write_to_transport(
         &self,
         context: &mut TransportProcessorContext,
-        writer: &mut Vec<u8>,
+        writer: &mut Cursor<Vec<u8>>,
     ) -> Result<()> {
         let (most_significant, least_significant) = self.as_u64_pair();
         u64::write_to_transport(&most_significant, context, writer)?;

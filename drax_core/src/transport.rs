@@ -10,7 +10,7 @@ pub mod frame;
 pub mod pipeline;
 
 use std::fmt::{Display, Formatter};
-use std::io::Read;
+use std::io::{Cursor, Read};
 use std::num::TryFromIntError;
 use std::string::FromUtf8Error;
 use tokio::io::AsyncRead;
@@ -129,7 +129,7 @@ pub trait DraxTransport {
     fn write_to_transport(
         &self,
         context: &mut TransportProcessorContext,
-        writer: &mut Vec<u8>,
+        writer: &mut Cursor<Vec<u8>>,
     ) -> Result<()>;
 
     fn read_from_transport<R: Read>(
