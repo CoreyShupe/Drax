@@ -38,6 +38,16 @@ pub fn link<T1, T2, T3>(
     }
 }
 
+pub fn share_link<T1: Send + Sync, T2: Send + Sync, T3: Send + Sync>(
+    linkage: ShareChain<T1, T2>,
+    function: ShareChain<T2, T3>,
+) -> ShareChainLink<T1, T2, T3> {
+    ShareChainLink {
+        process_chain_linkage: linkage,
+        process_chain_fn: function,
+    }
+}
+
 pub type BoxedChain<T1, T2> = Box<dyn ChainProcessor<Input = T1, Output = T2>>;
 
 pub struct ProcessChainLink<T1, T2, T3> {
