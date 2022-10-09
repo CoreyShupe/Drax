@@ -102,7 +102,7 @@ pub async fn main() -> anyhow::Result<()> {
         drax::transport::frame::FrameDecoder::new(-1),
         StatusResponseChainProcessor
     );
-    let mut write_pipeline = link!(GenericWriter, FrameEncoder::new(-1), FrameSizeAppender);
+    let write_pipeline = link!(GenericWriter, FrameEncoder::new(-1), FrameSizeAppender);
 
     let buffer = drax::prelude::BytesMut::with_capacity(BUFFER_CAPACITY);
     let mut drax_transport_pipeline =

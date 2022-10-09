@@ -1,4 +1,5 @@
 use crate::transport::TransportProcessorContext;
+use std::sync::Arc;
 
 macro_rules! process_chain_link_internal {
     ($t1:ident, $t2:ident) => {
@@ -54,7 +55,7 @@ impl<T1, T2, T3> ChainProcessor for ProcessChainLink<T1, T2, T3> {
     process_chain_link_internal!(T1, T3);
 }
 
-pub type ShareChain<T1, T2> = Box<dyn ChainProcessor<Input = T1, Output = T2> + Send + Sync>;
+pub type ShareChain<T1, T2> = Arc<dyn ChainProcessor<Input = T1, Output = T2> + Send + Sync>;
 
 pub struct ShareChainLink<T1: Send + Sync, T2: Send + Sync, T3: Send + Sync> {
     process_chain_linkage: ShareChain<T1, T2>,
@@ -86,7 +87,7 @@ macro_rules! link {
 #[macro_export]
 macro_rules! share_link {
     ($l1:expr, $l2:expr) => {
-        drax::transport::pipeline::share_link(Box::new($l1), Box::new($l2));
+        drax::transport::pipeline::share_link(std::sync::Arc::new($l1), std::sync::Arc::new($l2));
     };
     ($l1:expr, $l2:expr, $($etc:expr)+) => {
         share_link!($l1, share_link!($l2, $($etc)+));
