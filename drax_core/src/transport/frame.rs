@@ -70,7 +70,7 @@ impl ChainProcessor for FrameEncoder {
     type Output = Vec<u8>;
 
     fn process(
-        &mut self,
+        &self,
         context: &mut TransportProcessorContext,
         input: Self::Input,
     ) -> crate::transport::Result<Self::Output> {
@@ -151,7 +151,7 @@ impl ChainProcessor for FrameDecoder {
     type Output = PacketFrame;
 
     fn process(
-        &mut self,
+        &self,
         context: &mut TransportProcessorContext,
         input: Self::Input,
     ) -> crate::transport::Result<Self::Output> {

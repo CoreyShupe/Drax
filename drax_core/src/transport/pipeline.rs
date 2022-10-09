@@ -6,7 +6,7 @@ macro_rules! process_chain_link_internal {
         type Output = $t2;
 
         fn process(
-            &mut self,
+            &self,
             context: &mut TransportProcessorContext,
             input: Self::Input,
         ) -> super::Result<Self::Output> {
@@ -21,7 +21,7 @@ pub trait ChainProcessor {
     type Output;
 
     fn process<'a>(
-        &'a mut self,
+        &'a self,
         context: &'a mut TransportProcessorContext,
         input: Self::Input,
     ) -> super::Result<Self::Output>;

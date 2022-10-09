@@ -6,7 +6,7 @@ impl super::pipeline::ChainProcessor for FrameSizeAppender {
     type Output = Vec<u8>;
 
     fn process(
-        &mut self,
+        &self,
         context: &mut super::TransportProcessorContext,
         input: Self::Input,
     ) -> super::Result<Self::Output> {
@@ -23,7 +23,7 @@ impl super::pipeline::ChainProcessor for GenericWriter {
     type Output = super::frame::PacketFrame;
 
     fn process(
-        &mut self,
+        &self,
         context: &mut super::TransportProcessorContext,
         input: Self::Input,
     ) -> super::Result<Self::Output>

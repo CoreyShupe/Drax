@@ -82,7 +82,7 @@ impl ChainProcessor for StatusResponseChainProcessor {
     type Output = ClientBoundStatusPacket;
 
     fn process(
-        &mut self,
+        &self,
         context: &mut drax::transport::TransportProcessorContext,
         input: Self::Input,
     ) -> drax::transport::Result<Self::Output> {
