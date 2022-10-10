@@ -358,18 +358,33 @@ pub(crate) fn create_type_ser(
                 }
             }
         },
-        RawType::Maybe(inner) => {
-            let next_ident = Ident::new("next", Span::call_site());
-            let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
-            quote::quote! {
-                {
-                    drax::transport::DraxTransport::write_to_transport(&#ident.is_some(), context, writer)?;
-                    if let Some(#next_ident) = #ident.as_ref() {
-                        #inner_type_ser
+        RawType::Maybe(inner) => match **inner {
+            RawType::Primitive => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        drax::transport::DraxTransport::write_to_transport(&#ident.is_some(), context, writer)?;
+                        if let Some(#next_ident) = #ident.as_ref() {
+                            let #next_ident = *#next_ident;
+                            #inner_type_ser
+                        }
                     }
                 }
             }
-        }
+            _ => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        drax::transport::DraxTransport::write_to_transport(&#ident.is_some(), context, writer)?;
+                        if let Some(#next_ident) = #ident.as_ref() {
+                            #inner_type_ser
+                        }
+                    }
+                }
+            }
+        },
         RawType::Vec(inner) => match **inner {
             RawType::Primitive => {
                 let next_ident = Ident::new("next", Span::call_site());
@@ -395,17 +410,31 @@ pub(crate) fn create_type_ser(
                 }
             }
         },
-        RawType::Option(inner) => {
-            let next_ident = Ident::new("next", Span::call_site());
-            let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
-            quote::quote! {
-                {
-                    if let Some(#next_ident) = #ident.as_ref() {
-                        #inner_type_ser
+        RawType::Option(inner) => match **inner {
+            RawType::Primitive => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        if let Some(#next_ident) = #ident.as_ref() {
+                            let #next_ident = *#next_ident;
+                            #inner_type_ser
+                        }
                     }
                 }
             }
-        }
+            _ => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        if let Some(#next_ident) = #ident.as_ref() {
+                            #inner_type_ser
+                        }
+                    }
+                }
+            }
+        },
         RawType::Primitive => {
             quote::quote!(drax::transport::DraxTransport::write_to_transport(&#ident, context, writer)?;)
         }
@@ -469,18 +498,33 @@ pub(crate) fn create_type_sizer(
                 }
             }
         },
-        RawType::Maybe(inner) => {
-            let next_ident = Ident::new("next", Span::call_site());
-            let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
-            quote::quote! {
-                {
-                    size += drax::transport::DraxTransport::precondition_size(&#ident.is_some(), context)?;
-                    if let Some(#next_ident) = #ident.as_ref() {
-                        #inner_type_sizer
+        RawType::Maybe(inner) => match **inner {
+            RawType::Primitive => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        size += drax::transport::DraxTransport::precondition_size(&#ident.is_some(), context)?;
+                        if let Some(#next_ident) = #ident.as_ref() {
+                            let #next_ident = *#next_ident;
+                            #inner_type_sizer
+                        }
                     }
                 }
             }
-        }
+            _ => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        size += drax::transport::DraxTransport::precondition_size(&#ident.is_some(), context)?;
+                        if let Some(#next_ident) = #ident.as_ref() {
+                            #inner_type_sizer
+                        }
+                    }
+                }
+            }
+        },
         RawType::Vec(inner) => match **inner {
             RawType::Primitive => {
                 let next_ident = Ident::new("next", Span::call_site());
@@ -506,17 +550,31 @@ pub(crate) fn create_type_sizer(
                 }
             }
         },
-        RawType::Option(inner) => {
-            let next_ident = Ident::new("next", Span::call_site());
-            let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
-            quote::quote! {
-                {
-                    if let Some(#next_ident) = #ident.as_ref() {
-                        #inner_type_sizer
+        RawType::Option(inner) => match **inner {
+            RawType::Primitive => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        if let Some(#next_ident) = #ident.as_ref() {
+                            let #next_ident = *#next_ident;
+                            #inner_type_sizer
+                        }
                     }
                 }
             }
-        }
+            _ => {
+                let next_ident = Ident::new("next", Span::call_site());
+                let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        if let Some(#next_ident) = #ident.as_ref() {
+                            #inner_type_sizer
+                        }
+                    }
+                }
+            }
+        },
         RawType::Primitive => {
             quote::quote!(size += drax::transport::DraxTransport::precondition_size(&#ident, context)?;)
         }
