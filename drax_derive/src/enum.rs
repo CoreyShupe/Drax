@@ -43,19 +43,10 @@ impl DraxVariant {
             .fields
             .iter()
             .flat_map(|field| {
-                if self.named_fields {
-                    vec![
-                        TokenTree::from(field.field_ident.clone()),
-                        TokenTree::from(Punct::new(':', Spacing::Alone)),
-                        TokenTree::from(Ident::new("_", Span::call_site())),
-                        TokenTree::from(Punct::new(',', Spacing::Alone)),
-                    ]
-                } else {
-                    vec![
-                        TokenTree::from(field.field_ident.clone()),
-                        TokenTree::from(Punct::new(',', Spacing::Alone)),
-                    ]
-                }
+                vec![
+                    TokenTree::from(field.field_ident.clone()),
+                    TokenTree::from(Punct::new(',', Spacing::Alone)),
+                ]
             })
             .collect();
         let creator = if self.named_fields {

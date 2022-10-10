@@ -53,7 +53,7 @@ impl DraxField {
                     .cloned()
                     .unwrap_or_else(|| quote::quote!(Default::default()));
                 quote::quote! {
-                    let #ident = if !{ #skip_req } {
+                    let #ident: _ = if !{ #skip_req } {
                         #de
                     } else {
                         #otherwise
