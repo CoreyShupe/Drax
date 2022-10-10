@@ -26,6 +26,13 @@ impl<W> EncryptedWriter<W> {
             stream: Some(stream),
         }
     }
+
+    pub fn noop(write: W) -> EncryptedWriter<W> {
+        EncryptedWriter {
+            write,
+            stream: None,
+        }
+    }
 }
 
 impl<W: AsyncWrite + Unpin + Sized> AsyncWrite for EncryptedWriter<W> {
@@ -69,6 +76,10 @@ impl<R> DecryptRead<R> {
             read,
             stream: Some(stream),
         }
+    }
+
+    pub fn noop(read: R) -> DecryptRead<R> {
+        DecryptRead { read, stream: None }
     }
 }
 
