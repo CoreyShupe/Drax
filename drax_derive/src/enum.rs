@@ -46,7 +46,7 @@ impl DraxVariant {
                 vec![
                     TokenTree::from(field.field_ident.clone()),
                     TokenTree::from(Punct::new(':', Spacing::Alone)),
-                    TokenTree::from(Punct::new('_', Spacing::Alone)),
+                    TokenTree::from(Ident::new("_", Span::call_site())),
                     TokenTree::from(Punct::new(',', Spacing::Alone)),
                 ]
             })
