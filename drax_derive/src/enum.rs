@@ -89,9 +89,10 @@ impl DraxVariant {
             let key_type = &self.key_type;
             let ref_ser = create_type_ser(&key_ident, key_type, &TypeAttributeSheet::default());
             let key_out = &self.defined_key;
+            let key_tokens = &key_type.expanded_tokens;
             quote::quote! {
                 {
-                    let #key_ident = #key_out;
+                    let #key_ident: #key_tokens = #key_out;
                     #ref_ser
                 }
             }
