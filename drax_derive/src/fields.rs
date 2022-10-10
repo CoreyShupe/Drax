@@ -44,7 +44,7 @@ impl DraxField {
         let ident = &self.field_ident;
         let de = create_type_de(ident, &self.type_ref, &self.sheet);
         match &self.sheet.skip_if {
-            None => quote::quote!(let #ident = { #de };),
+            None => quote::quote!(let #ident: _ = { #de };),
             Some(skip_req) => {
                 let otherwise = self
                     .sheet
