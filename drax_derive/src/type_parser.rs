@@ -347,7 +347,7 @@ impl RawType {
                         return (RawType::UnknownObjectType.wrapped(type_stream), stream);
                     }
                     if punct.as_char() == '>' {
-                        panic!("Invalid character.");
+                        panic!("Invalid character... {}", type_stream);
                     }
                 }
                 _ => panic!("Unsupported token during type definition."),
