@@ -45,6 +45,8 @@ impl DraxVariant {
             .flat_map(|field| {
                 vec![
                     TokenTree::from(field.field_ident.clone()),
+                    TokenTree::from(Punct::new(':', Spacing::Alone)),
+                    TokenTree::from(Punct::new('_', Spacing::Alone)),
                     TokenTree::from(Punct::new(',', Spacing::Alone)),
                 ]
             })
