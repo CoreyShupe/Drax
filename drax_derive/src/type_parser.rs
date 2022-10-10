@@ -425,7 +425,7 @@ pub(crate) fn create_type_ser(
                 quote::quote!(#custom(#follower, #ident, context, writer)?;)
             }
         },
-        RawType::Tag => quote::quote!(drax::nbt::write_nbt(#ident)?;),
+        RawType::Tag => quote::quote!(drax::nbt::write_nbt(#ident, writer)?;),
         RawType::OptionalTag => quote::quote!(drax::nbt::write_optional_nbt(#ident)?;),
     }
 }
