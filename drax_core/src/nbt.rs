@@ -352,12 +352,16 @@ fn load_tag<R: Read>(
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct CompoundTag {
     mappings: HashMap<String, Tag>,
 }
 
 impl CompoundTag {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
     pub fn put_tag(&mut self, location: String, tag: Tag) {
         self.mappings.insert(location, tag);
     }
