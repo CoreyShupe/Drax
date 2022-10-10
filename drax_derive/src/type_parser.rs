@@ -649,7 +649,7 @@ pub(crate) fn create_type_de(
             None => {
                 quote::quote! {
                     {
-                        match drax::nbt::read_nbt(reader, 0x200000L)? {
+                        match drax::nbt::read_nbt(reader, 0x200000u64)? {
                             Some(tag) => tag,
                             None => return drax::transport::Error::cause("Invalid empty tag when tag expected."),
                         }
@@ -659,7 +659,7 @@ pub(crate) fn create_type_de(
         },
         RawType::OptionalTag => match sheet.serial_type.custom_de() {
             Some((_, lim)) => quote::quote!(drax::nbt::read_nbt(reader, #lim)?),
-            None => quote::quote!(drax::nbt::read_nbt(reader, 0x200000L)?),
+            None => quote::quote!(drax::nbt::read_nbt(reader, 0x200000u64)?),
         },
     }
 }
