@@ -1,4 +1,4 @@
-use crate::transport::pipeline::{BoxedChain, ShareChain};
+use crate::transport::pipeline::ShareChain;
 use crate::transport::{Error, TransportProcessorContext};
 use bytes::{Buf, BufMut, BytesMut};
 use futures::ready;

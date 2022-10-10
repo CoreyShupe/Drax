@@ -15,13 +15,16 @@ pin_project! {
         #[pin]
         write: W,
         #[pin]
-        stream: EncryptionStream,
+        stream: Option<EncryptionStream>,
     }
 }
 
 impl<W> EncryptedWriter<W> {
     pub fn new(write: W, stream: EncryptionStream) -> EncryptedWriter<W> {
-        EncryptedWriter { write, stream }
+        EncryptedWriter {
+            write,
+            stream: Some(stream),
+        }
     }
 }
 
@@ -33,8 +36,13 @@ impl<W: AsyncWrite + Unpin + Sized> AsyncWrite for EncryptedWriter<W> {
     ) -> Poll<Result<usize, Error>> {
         let mut block_copy = buf.to_vec();
         let mut me = self.project();
-        me.stream.encrypt(&mut block_copy);
-        Pin::new(&mut me.write).poll_write(cx, &block_copy)
+        match (*me.stream).as_mut() {
+            None => Pin::new(&mut me.write).poll_write(cx, &block_copy),
+            Some(stream) => {
+                stream.encrypt(&mut block_copy);
+                Pin::new(&mut me.write).poll_write(cx, &block_copy)
+            }
+        }
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
@@ -51,13 +59,16 @@ pin_project! {
         #[pin]
         read: R,
         #[pin]
-        stream: EncryptionStream,
+        stream: Option<EncryptionStream>,
     }
 }
 
 impl<R> DecryptRead<R> {
     pub fn new(read: R, stream: EncryptionStream) -> DecryptRead<R> {
-        DecryptRead { read, stream }
+        DecryptRead {
+            read,
+            stream: Some(stream),
+        }
     }
 }
 
@@ -68,18 +79,21 @@ impl<R: AsyncRead + Unpin + Sized> AsyncRead for DecryptRead<R> {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
         let mut me = self.project();
-        unsafe {
-            let mut buf_read = ReadBuf::uninit(buf.unfilled_mut());
+        match (*me.stream).as_mut() {
+            Some(stream) => unsafe {
+                let mut buf_read = ReadBuf::uninit(buf.unfilled_mut());
 
-            ready!(Pin::new(&mut me.read).poll_read(cx, &mut buf_read)?);
+                ready!(Pin::new(&mut me.read).poll_read(cx, &mut buf_read)?);
 
-            let filled_mut = buf_read.filled_mut();
-            Pin::new(&mut me.stream).decrypt(filled_mut);
+                let filled_mut = buf_read.filled_mut();
+                Pin::new(stream).decrypt(filled_mut);
 
-            let len = buf_read.filled().len();
-            buf.assume_init(len);
-            buf.advance(len);
+                let len = buf_read.filled().len();
+                buf.assume_init(len);
+                buf.advance(len);
+                Poll::Ready(Ok(()))
+            },
+            None => Pin::new(&mut me.read).poll_read(cx, buf),
         }
-        Poll::Ready(Ok(()))
     }
 }
