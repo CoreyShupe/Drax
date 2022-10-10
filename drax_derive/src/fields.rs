@@ -1,5 +1,6 @@
 use crate::type_parser::{
-    create_mapping, create_type_de, create_type_ser, create_type_sizer, RawType, TypeAttributeSheet,
+    create_mapping, create_type_de, create_type_ser, create_type_sizer, RawType,
+    TypeAttributeSheet, WrappedType,
 };
 use proc_macro2::{Ident, Span, TokenStream};
 use syn::Fields;
@@ -8,7 +9,7 @@ use syn::Fields;
 pub struct DraxField {
     pub(crate) field_ident: Ident,
     sheet: TypeAttributeSheet,
-    pub(crate) type_ref: RawType,
+    pub(crate) type_ref: WrappedType,
 }
 
 impl DraxField {
@@ -42,9 +43,10 @@ impl DraxField {
 
     pub fn de(&self) -> TokenStream {
         let ident = &self.field_ident;
+        let self_info = &self.type_ref.expanded_tokens;
         let de = create_type_de(ident, &self.type_ref, &self.sheet);
         match &self.sheet.skip_if {
-            None => quote::quote!(let #ident: _ = { #de };),
+            None => quote::quote!(let #ident: #self_info = { #de };),
             Some(skip_req) => {
                 let otherwise = self
                     .sheet
@@ -53,7 +55,7 @@ impl DraxField {
                     .cloned()
                     .unwrap_or_else(|| quote::quote!(Default::default()));
                 quote::quote! {
-                    let #ident: _ = if !{ #skip_req } {
+                    let #ident: #self_info = if !{ #skip_req } {
                         #de
                     } else {
                         #otherwise

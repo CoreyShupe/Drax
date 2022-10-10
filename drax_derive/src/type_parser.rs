@@ -1,5 +1,5 @@
 use proc_macro2::token_stream::IntoIter;
-use proc_macro2::{Ident, Literal, Span, TokenStream, TokenTree};
+use proc_macro2::{Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 use quote::{ToTokens, TokenStreamExt};
 use syn::{Attribute, Type};
 
@@ -241,13 +241,19 @@ impl TypeAttributeSheet {
 }
 
 #[derive(Clone)]
+pub(crate) struct WrappedType {
+    pub(crate) expanded_tokens: TokenStream,
+    pub(crate) raw_type: RawType,
+}
+
+#[derive(Clone)]
 pub(crate) enum RawType {
     VarInt,
     VarLong,
-    SizedVec(Box<RawType>),
-    Maybe(Box<RawType>),
-    Vec(Box<RawType>),
-    Option(Box<RawType>),
+    SizedVec(Box<WrappedType>),
+    Maybe(Box<WrappedType>),
+    Vec(Box<WrappedType>),
+    Option(Box<WrappedType>),
     Primitive,
     String,
     UnknownObjectType,
@@ -256,51 +262,101 @@ pub(crate) enum RawType {
 }
 
 impl RawType {
-    pub fn from_token_stream(mut stream: IntoIter) -> RawType {
+    pub fn wrapped(self, stream: TokenStream) -> WrappedType {
+        WrappedType {
+            expanded_tokens: stream,
+            raw_type: self,
+        }
+    }
+
+    pub fn from_token_stream(stream: IntoIter) -> WrappedType {
+        Self::internal_from_token_stream(stream).0
+    }
+
+    fn internal_from_token_stream(mut stream: IntoIter) -> (WrappedType, IntoIter) {
+        let mut type_stream = TokenStream::new();
         while let Some(tree) = stream.next() {
+            type_stream.append(tree.clone());
             match tree {
                 TokenTree::Ident(pop_ident) => match pop_ident.to_string().as_str() {
                     "char" => panic!("Chars are currently not encodable."),
-                    "VarInt" => return RawType::VarInt,
-                    "VarLong" => return RawType::VarLong,
-                    "CompoundTag" => return RawType::Tag,
+                    "VarInt" => return (RawType::VarInt.wrapped(type_stream), stream),
+                    "VarLong" => return (RawType::VarLong.wrapped(type_stream), stream),
+                    "CompoundTag" => return (RawType::Tag.wrapped(type_stream), stream),
                     "SizedVec" => {
                         assert_next_punct(&mut stream, '<');
-                        return RawType::SizedVec(Box::new(Self::from_token_stream(stream)));
+                        type_stream.append(TokenTree::Punct(Punct::new('<', Spacing::Alone)));
+                        let (wrapped_next, mut stream) = Self::internal_from_token_stream(stream);
+                        type_stream.append_all(wrapped_next.expanded_tokens.clone());
+                        let next = RawType::SizedVec(Box::new(wrapped_next));
+                        assert_next_punct(&mut stream, '>');
+                        type_stream.append(TokenTree::Punct(Punct::new('>', Spacing::Alone)));
+                        return (next.wrapped(type_stream), stream);
                     }
                     "Maybe" => {
                         assert_next_punct(&mut stream, '<');
-                        return RawType::Maybe(Box::new(Self::from_token_stream(stream)));
+                        type_stream.append(TokenTree::Punct(Punct::new('<', Spacing::Alone)));
+                        let (wrapped_next, mut stream) = Self::internal_from_token_stream(stream);
+                        type_stream.append_all(wrapped_next.expanded_tokens.clone());
+                        let next = RawType::Maybe(Box::new(wrapped_next));
+                        assert_next_punct(&mut stream, '>');
+                        type_stream.append(TokenTree::Punct(Punct::new('>', Spacing::Alone)));
+                        return (next.wrapped(type_stream), stream);
                     }
                     "Vec" => {
                         assert_next_punct(&mut stream, '<');
-                        return RawType::Vec(Box::new(Self::from_token_stream(stream)));
+                        type_stream.append(TokenTree::Punct(Punct::new('<', Spacing::Alone)));
+                        let (wrapped_next, mut stream) = Self::internal_from_token_stream(stream);
+                        type_stream.append_all(wrapped_next.expanded_tokens.clone());
+                        let next = RawType::Vec(Box::new(wrapped_next));
+                        assert_next_punct(&mut stream, '>');
+                        type_stream.append(TokenTree::Punct(Punct::new('>', Spacing::Alone)));
+                        return (next.wrapped(type_stream), stream);
                     }
                     "Option" => {
                         assert_next_punct(&mut stream, '<');
-                        let inner = Self::from_token_stream(stream);
-                        if matches!(inner, RawType::Tag) {
-                            return RawType::OptionalTag;
-                        }
-                        return RawType::Option(Box::new(inner));
+                        type_stream.append(TokenTree::Punct(Punct::new('<', Spacing::Alone)));
+                        let (wrapped_next, mut stream) = Self::internal_from_token_stream(stream);
+                        type_stream.append_all(wrapped_next.expanded_tokens.clone());
+                        let next: RawType = if matches!(wrapped_next.raw_type, RawType::Tag) {
+                            RawType::OptionalTag
+                        } else {
+                            RawType::Option(Box::new(wrapped_next))
+                        };
+                        assert_next_punct(&mut stream, '>');
+                        type_stream.append(TokenTree::Punct(Punct::new('>', Spacing::Alone)));
+                        return (next.wrapped(type_stream), stream);
                     }
                     "bool" | "u8" | "i8" | "u16" | "i16" | "u32" | "i32" | "u64" | "i64"
-                    | "u128" | "i128" | "f32" | "f64" => return RawType::Primitive,
-                    "String" => return RawType::String,
+                    | "u128" | "i128" | "f32" | "f64" => {
+                        return (RawType::Primitive.wrapped(type_stream), stream)
+                    }
+                    "String" => return (RawType::String.wrapped(type_stream), stream),
                     _ => (),
                 },
                 TokenTree::Punct(punct) => {
-                    if punct.as_char() == '<' || punct.as_char() == '>' {
-                        return RawType::UnknownObjectType;
+                    if punct.as_char() == '<' {
+                        while let Some(expecting_next) = stream.next() {
+                            type_stream.append(expecting_next.clone());
+                            if let TokenTree::Punct(punct) = expecting_next {
+                                if punct.as_char() == '>' {
+                                    break;
+                                }
+                            }
+                        }
+                        return (RawType::UnknownObjectType.wrapped(type_stream), stream);
+                    }
+                    if punct.as_char() == '>' {
+                        panic!("Invalid character.");
                     }
                 }
                 _ => panic!("Unsupported token during type definition."),
             }
         }
-        RawType::UnknownObjectType
+        return (RawType::UnknownObjectType.wrapped(type_stream), stream);
     }
 
-    pub(crate) fn normalize_type(syn_type: &Type) -> Self {
+    pub(crate) fn normalize_type(syn_type: &Type) -> WrappedType {
         match syn_type {
             Type::Path(type_path) => {
                 Self::from_token_stream(type_path.path.to_token_stream().into_iter())
@@ -310,8 +366,8 @@ impl RawType {
     }
 }
 
-pub(crate) fn create_mapping(from_expr: TokenStream, to: Ident, raw: &RawType) -> TokenStream {
-    match raw {
+pub(crate) fn create_mapping(from_expr: TokenStream, to: Ident, raw: &WrappedType) -> TokenStream {
+    match &raw.raw_type {
         RawType::VarInt | RawType::VarLong | RawType::Primitive => {
             quote::quote!(let #to = #from_expr;)
         }
@@ -321,17 +377,17 @@ pub(crate) fn create_mapping(from_expr: TokenStream, to: Ident, raw: &RawType) -
 
 pub(crate) fn create_type_ser(
     ident: &Ident,
-    raw: &RawType,
+    raw: &WrappedType,
     sheet: &TypeAttributeSheet,
 ) -> TokenStream {
-    match raw {
+    match &raw.raw_type {
         RawType::VarInt => {
             quote::quote!(drax::extension::write_var_int_sync(#ident, context, writer)?;)
         }
         RawType::VarLong => {
             quote::quote!(drax::extension::write_var_long_sync(#ident, context, writer)?;)
         }
-        RawType::SizedVec(inner) => match **inner {
+        RawType::SizedVec(inner) => match (**inner).raw_type {
             RawType::Primitive => {
                 let next_ident = Ident::new("next", Span::call_site());
                 let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
@@ -358,7 +414,7 @@ pub(crate) fn create_type_ser(
                 }
             }
         },
-        RawType::Maybe(inner) => match **inner {
+        RawType::Maybe(inner) => match (**inner).raw_type {
             RawType::Primitive => {
                 let next_ident = Ident::new("next", Span::call_site());
                 let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
@@ -385,7 +441,7 @@ pub(crate) fn create_type_ser(
                 }
             }
         },
-        RawType::Vec(inner) => match **inner {
+        RawType::Vec(inner) => match (**inner).raw_type {
             RawType::Primitive => {
                 let next_ident = Ident::new("next", Span::call_site());
                 let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
@@ -410,7 +466,7 @@ pub(crate) fn create_type_ser(
                 }
             }
         },
-        RawType::Option(inner) => match **inner {
+        RawType::Option(inner) => match (**inner).raw_type {
             RawType::Primitive => {
                 let next_ident = Ident::new("next", Span::call_site());
                 let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
@@ -461,17 +517,17 @@ pub(crate) fn create_type_ser(
 
 pub(crate) fn create_type_sizer(
     ident: &Ident,
-    raw: &RawType,
+    raw: &WrappedType,
     sheet: &TypeAttributeSheet,
 ) -> TokenStream {
-    match raw {
+    match &raw.raw_type {
         RawType::VarInt => {
             quote::quote!(size += drax::extension::size_var_int(#ident, context)?;)
         }
         RawType::VarLong => {
             quote::quote!(size += drax::extension::size_var_long(#ident, context)?;)
         }
-        RawType::SizedVec(inner) => match **inner {
+        RawType::SizedVec(inner) => match (**inner).raw_type {
             RawType::Primitive => {
                 let next_ident = Ident::new("next", Span::call_site());
                 let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
@@ -498,7 +554,7 @@ pub(crate) fn create_type_sizer(
                 }
             }
         },
-        RawType::Maybe(inner) => match **inner {
+        RawType::Maybe(inner) => match (**inner).raw_type {
             RawType::Primitive => {
                 let next_ident = Ident::new("next", Span::call_site());
                 let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
@@ -525,7 +581,7 @@ pub(crate) fn create_type_sizer(
                 }
             }
         },
-        RawType::Vec(inner) => match **inner {
+        RawType::Vec(inner) => match (**inner).raw_type {
             RawType::Primitive => {
                 let next_ident = Ident::new("next", Span::call_site());
                 let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
@@ -550,7 +606,7 @@ pub(crate) fn create_type_sizer(
                 }
             }
         },
-        RawType::Option(inner) => match **inner {
+        RawType::Option(inner) => match (**inner).raw_type {
             RawType::Primitive => {
                 let next_ident = Ident::new("next", Span::call_site());
                 let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
@@ -601,10 +657,10 @@ pub(crate) fn create_type_sizer(
 
 pub(crate) fn create_type_de(
     ident: &Ident,
-    raw: &RawType,
+    raw: &WrappedType,
     sheet: &TypeAttributeSheet,
 ) -> TokenStream {
-    match raw {
+    match &raw.raw_type {
         RawType::VarInt => {
             quote::quote!(drax::extension::read_var_int_sync(context, reader)?)
         }

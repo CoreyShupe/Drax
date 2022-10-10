@@ -1,7 +1,7 @@
 use crate::fields::DraxField;
 use crate::type_parser::{
     create_type_de, create_type_ser, create_type_sizer, RawType, StructAttributeSheet,
-    TypeAttributeSheet,
+    TypeAttributeSheet, WrappedType,
 };
 use proc_macro2::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, TokenTree};
 use syn::{DataEnum, DeriveInput, Variant};
@@ -13,11 +13,11 @@ pub(crate) struct DraxVariant {
     named_fields: bool,
     attribute_sheet: StructAttributeSheet,
     defined_key: TokenStream,
-    key_type: RawType,
+    key_type: WrappedType,
 }
 
 impl DraxVariant {
-    pub fn from_variant(variant: &Variant, ordinal: usize, key_type: RawType) -> Self {
+    pub fn from_variant(variant: &Variant, ordinal: usize, key_type: WrappedType) -> Self {
         let fields = &variant.fields;
         let sheet = StructAttributeSheet::create_sheet(&variant.attrs);
         let defined_key = sheet.enum_key.as_ref().cloned().unwrap_or_else(|| {
@@ -67,8 +67,11 @@ impl DraxVariant {
         let ser = self
             .fields
             .iter()
-            .map(|x| match x.type_ref {
-                RawType::Primitive => {
+            .map(|x| match &x.type_ref {
+                WrappedType {
+                    expanded_tokens: _,
+                    raw_type: RawType::Primitive,
+                } => {
                     let ident = &x.field_ident;
                     let ser = x.ser();
                     quote::quote! {
@@ -126,8 +129,11 @@ impl DraxVariant {
         let sizer = self
             .fields
             .iter()
-            .map(|x| match x.type_ref {
-                RawType::Primitive => {
+            .map(|x| match &x.type_ref {
+                WrappedType {
+                    expanded_tokens: _,
+                    raw_type: RawType::Primitive,
+                } => {
                     let ident = &x.field_ident;
                     let sizer = x.size();
                     quote::quote! {
@@ -303,9 +309,9 @@ pub fn expand_drax_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
             .expect("An enum must provide a valid key."),
     );
 
-    let enum_key_type = match &true_key_type {
-        KeyType::Inherited(_) => RawType::UnknownObjectType,
-        KeyType::InheritedMatch(_) => RawType::UnknownObjectType,
+    let enum_key_type: WrappedType = match &true_key_type {
+        KeyType::Inherited(ts) => RawType::UnknownObjectType.wrapped(ts.clone()),
+        KeyType::InheritedMatch(ts) => RawType::UnknownObjectType.wrapped(ts.clone()),
         KeyType::Match(ts) => RawType::from_token_stream(ts.clone().into_iter()),
         KeyType::RawType(ts) => RawType::from_token_stream(ts.clone().into_iter()),
     };
