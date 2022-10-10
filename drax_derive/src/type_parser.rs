@@ -1,3 +1,5 @@
+use std::iter::Peekable;
+
 use proc_macro2::token_stream::IntoIter;
 use proc_macro2::{Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 use quote::{ToTokens, TokenStreamExt};
@@ -65,6 +67,15 @@ impl SerialType {
 }
 
 fn assert_next_punct(args: &mut IntoIter, character: char) {
+    let next = args.next().expect("Args must contain a following =");
+    if let TokenTree::Punct(next_punct) = next {
+        assert_eq!(character, next_punct.as_char())
+    } else {
+        panic!("Did not find {} where expected", character)
+    }
+}
+
+fn peek_next_punct(args: &mut Peekable<IntoIter>, character: char) {
     let next = args.next().expect("Args must contain a following =");
     if let TokenTree::Punct(next_punct) = next {
         assert_eq!(character, next_punct.as_char())
@@ -270,12 +281,20 @@ impl RawType {
     }
 
     pub fn from_token_stream(stream: IntoIter) -> WrappedType {
-        Self::internal_from_token_stream(stream).0
+        Self::internal_from_token_stream(stream.peekable()).0
     }
 
-    fn internal_from_token_stream(mut stream: IntoIter) -> (WrappedType, IntoIter) {
+    fn internal_from_token_stream(
+        mut stream: Peekable<IntoIter>,
+    ) -> (WrappedType, Peekable<IntoIter>) {
         let mut type_stream = TokenStream::new();
-        while let Some(tree) = stream.next() {
+        while let Some(tree) = stream.peek() {
+            if let TokenTree::Punct(punct) = tree {
+                if punct.as_char() == '>' {
+                    return (RawType::UnknownObjectType.wrapped(type_stream), stream);
+                }
+            }
+            let tree = stream.next().unwrap();
             type_stream.append(tree.clone());
             match tree {
                 TokenTree::Ident(pop_ident) => match pop_ident.to_string().as_str() {
@@ -284,37 +303,37 @@ impl RawType {
                     "VarLong" => return (RawType::VarLong.wrapped(type_stream), stream),
                     "CompoundTag" => return (RawType::Tag.wrapped(type_stream), stream),
                     "SizedVec" => {
-                        assert_next_punct(&mut stream, '<');
+                        peek_next_punct(&mut stream, '<');
                         type_stream.append(TokenTree::Punct(Punct::new('<', Spacing::Alone)));
                         let (wrapped_next, mut stream) = Self::internal_from_token_stream(stream);
                         type_stream.append_all(wrapped_next.expanded_tokens.clone());
                         let next = RawType::SizedVec(Box::new(wrapped_next));
-                        assert_next_punct(&mut stream, '>');
+                        peek_next_punct(&mut stream, '>');
                         type_stream.append(TokenTree::Punct(Punct::new('>', Spacing::Alone)));
                         return (next.wrapped(type_stream), stream);
                     }
                     "Maybe" => {
-                        assert_next_punct(&mut stream, '<');
+                        peek_next_punct(&mut stream, '<');
                         type_stream.append(TokenTree::Punct(Punct::new('<', Spacing::Alone)));
                         let (wrapped_next, mut stream) = Self::internal_from_token_stream(stream);
                         type_stream.append_all(wrapped_next.expanded_tokens.clone());
                         let next = RawType::Maybe(Box::new(wrapped_next));
-                        assert_next_punct(&mut stream, '>');
+                        peek_next_punct(&mut stream, '>');
                         type_stream.append(TokenTree::Punct(Punct::new('>', Spacing::Alone)));
                         return (next.wrapped(type_stream), stream);
                     }
                     "Vec" => {
-                        assert_next_punct(&mut stream, '<');
+                        peek_next_punct(&mut stream, '<');
                         type_stream.append(TokenTree::Punct(Punct::new('<', Spacing::Alone)));
                         let (wrapped_next, mut stream) = Self::internal_from_token_stream(stream);
                         type_stream.append_all(wrapped_next.expanded_tokens.clone());
                         let next = RawType::Vec(Box::new(wrapped_next));
-                        assert_next_punct(&mut stream, '>');
+                        peek_next_punct(&mut stream, '>');
                         type_stream.append(TokenTree::Punct(Punct::new('>', Spacing::Alone)));
                         return (next.wrapped(type_stream), stream);
                     }
                     "Option" => {
-                        assert_next_punct(&mut stream, '<');
+                        peek_next_punct(&mut stream, '<');
                         type_stream.append(TokenTree::Punct(Punct::new('<', Spacing::Alone)));
                         let (wrapped_next, mut stream) = Self::internal_from_token_stream(stream);
                         type_stream.append_all(wrapped_next.expanded_tokens.clone());
@@ -323,7 +342,7 @@ impl RawType {
                         } else {
                             RawType::Option(Box::new(wrapped_next))
                         };
-                        assert_next_punct(&mut stream, '>');
+                        peek_next_punct(&mut stream, '>');
                         type_stream.append(TokenTree::Punct(Punct::new('>', Spacing::Alone)));
                         return (next.wrapped(type_stream), stream);
                     }
@@ -345,9 +364,6 @@ impl RawType {
                             }
                         }
                         return (RawType::UnknownObjectType.wrapped(type_stream), stream);
-                    }
-                    if punct.as_char() == '>' {
-                        panic!("Invalid character... {}", type_stream);
                     }
                 }
                 _ => panic!("Unsupported token during type definition."),
