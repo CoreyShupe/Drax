@@ -154,8 +154,8 @@ impl From<Vec<i64>> for Tag {
     }
 }
 
-impl From<Vec<Tag>> for Tag {
-    fn from(into: Vec<Tag>) -> Self {
+impl From<Vec<CompoundTag>> for Tag {
+    fn from(into: Vec<CompoundTag>) -> Self {
         Tag::ListTag {
             0: COMPOUND_TAG_BIT,
             1: into.into_iter().map(Tag::CompoundTag).collect(),
