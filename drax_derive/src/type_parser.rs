@@ -261,6 +261,7 @@ pub(crate) enum RawType {
     VarInt,
     VarLong,
     SizedVec(Box<WrappedType>),
+    ShortSizedVec(Box<WrappedType>),
     Maybe(Box<WrappedType>),
     Vec(Box<WrappedType>),
     Option(Box<WrappedType>),
@@ -429,6 +430,33 @@ pub(crate) fn create_type_ser(
                 }
             }
         },
+        RawType::ShortSizedVec(inner) => match (**inner).raw_type {
+            RawType::Primitive => {
+                let next_ident = Ident::new(&format!("{}_next", ident), Span::call_site());
+                let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        drax::transport::DraxTransport::write_to_transport(#ident.len().try_into()? as u16, context, writer)?;
+                        for #next_ident in #ident {
+                            let #next_ident = *#next_ident;
+                            #inner_type_ser
+                        }
+                    }
+                }
+            }
+            _ => {
+                let next_ident = Ident::new(&format!("{}_next", ident), Span::call_site());
+                let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        drax::transport::DraxTransport::write_to_transport(#ident.len().try_into()? as u16, context, writer)?;
+                        for #next_ident in #ident {
+                            #inner_type_ser
+                        }
+                    }
+                }
+            }
+        },
         RawType::Maybe(inner) => match (**inner).raw_type {
             RawType::Primitive => {
                 let next_ident = Ident::new(&format!("{}_next", ident), Span::call_site());
@@ -569,6 +597,33 @@ pub(crate) fn create_type_sizer(
                 }
             }
         },
+        RawType::ShortSizedVec(inner) => match (**inner).raw_type {
+            RawType::Primitive => {
+                let next_ident = Ident::new(&format!("{}_next", ident), Span::call_site());
+                let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        size += 2;
+                        for #next_ident in #ident {
+                            let #next_ident = *#next_ident;
+                            #inner_type_sizer
+                        }
+                    }
+                }
+            }
+            _ => {
+                let next_ident = Ident::new(&format!("{}_next", ident), Span::call_site());
+                let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
+                quote::quote! {
+                    {
+                        size += 2;
+                        for #next_ident in #ident {
+                            #inner_type_sizer
+                        }
+                    }
+                }
+            }
+        },
         RawType::Maybe(inner) => match (**inner).raw_type {
             RawType::Primitive => {
                 let next_ident = Ident::new(&format!("{}_next", ident), Span::call_site());
@@ -688,6 +743,23 @@ pub(crate) fn create_type_de(
             quote::quote! {
                 {
                     let length = drax::extension::read_var_int_sync(context, reader)?;
+                    let mut #ident = Vec::with_capacity(length as usize);
+                    for _ in 0..length {
+                        let #next_ident = {
+                            #inner_type_de
+                        };
+                        #ident.push(#next_ident);
+                    }
+                    #ident
+                }
+            }
+        }
+        RawType::ShortSizedVec(inner) => {
+            let next_ident = Ident::new(&format!("{}_next", ident), Span::call_site());
+            let inner_type_de = create_type_de(&next_ident, inner, sheet);
+            quote::quote! {
+                {
+                    let length = <u32 as drax::transport::DraxTransport>::read_var_int_sync(context, reader)?;
                     let mut #ident = Vec::with_capacity(length as usize);
                     for _ in 0..length {
                         let #next_ident = {
