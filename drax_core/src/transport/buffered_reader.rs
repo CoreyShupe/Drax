@@ -56,6 +56,7 @@ where
     type Output = crate::transport::Result<T>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        println!("Polling read.");
         let me = self.project();
         // poll read buffer mostly from read_buf in tokio AsyncReadExt
         {
@@ -76,6 +77,8 @@ where
                 assert_eq!(ptr, buf.filled().as_ptr());
                 buf.filled().len()
             };
+
+            println!("Read {} bytes", n);
 
             // Safety: This is guaranteed to be the number of initialized (and read)
             // bytes due to the invariants provided by `ReadBuf::filled`.
@@ -99,12 +102,14 @@ where
                     }
                     Err(_) => {
                         cx.waker().wake_by_ref();
+                        println!("Pending... up 1");
                         return Poll::Pending;
                     }
                 }
             }
             Some(size) => size,
         };
+        println!("Packet size: {}", size);
         if size <= me.current_buffer.len() {
             let chunk_result = me
                 .current_buffer
@@ -116,8 +121,10 @@ where
             let len = me.current_buffer.len();
             me.current_buffer.advance(size);
             me.current_buffer.reserve(capacity - len);
+            println!("Packet ready!");
             Poll::Ready(chunk_result)
         } else {
+            println!("Pending...");
             cx.waker().wake_by_ref();
             Poll::Pending
         }
