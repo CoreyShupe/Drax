@@ -59,6 +59,7 @@ where
         let me = self.project();
         let mut ready_size_inner = me.ready_size;
 
+        log::trace!("Beginning pre-read check for packet with len: {}", me.current_buffer.len());
         let size = match *ready_size_inner {
             None => {
                 let mut chunk_cursor = Cursor::new(me.current_buffer.chunk());
@@ -67,6 +68,7 @@ where
                     &mut chunk_cursor,
                 ) {
                     Ok(size) => {
+                        log::trace!("Size ready!");
                         *ready_size_inner = Some(size as usize);
                         me.current_buffer.advance(chunk_cursor.position() as usize);
                         size as usize
