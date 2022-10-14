@@ -140,7 +140,7 @@ impl ToTokens for IncludeStatement {
         let key_ty = &self.key_ty;
         let value_name = &self.value_name;
         tokens.append_all(quote::quote! {
-            let #value_name = context.retrieve_data::<#key_ty>().map(|x| *x).unwrap();
+            let #value_name = context.retrieve_data::<#key_ty>().cloned().unwrap();
         });
     }
 }
