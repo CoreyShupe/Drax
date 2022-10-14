@@ -47,7 +47,9 @@ fn read_tag_inner(tokens: &mut IntoIter, initial: bool) -> proc_macro::TokenStre
                 let inner_maker = match tokens.next() {
                     Some(TokenTree::Group(group)) => {
                         if matches!(group.delimiter(), Delimiter::Brace) {
-                            read_tag_inner(&mut group.stream().into_iter(), false).into()
+                            let ret = read_tag_inner(&mut group.stream().into_iter(), false).into();
+                            read_punct(tokens, ',');
+                            ret
                         } else {
                             panic!("Unexpected group {group:?}.");
                         }
