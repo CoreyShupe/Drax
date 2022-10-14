@@ -77,6 +77,8 @@ where
                 buf.filled().len()
             };
 
+            log::trace!("Read bytes: {}", n);
+
             if n == 0 {
                 return Poll::Ready(Err(Error::EOF));
             }

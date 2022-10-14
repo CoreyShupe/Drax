@@ -20,6 +20,7 @@ serde_json = "1.0.85"
 uuid = "1.1.2"
 byteorder = "1.4.3"
 cesu8 = "1.1.0"
+log = "0.4.17"
 
 [features]
 full = ["encryption", "compression", "pipelines"]
