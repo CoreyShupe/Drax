@@ -80,6 +80,10 @@ where
 
             println!("Read {} bytes", n);
 
+            if n == 0 {
+                return Poll::Ready(Error::cause("EOF in read stream."));
+            }
+
             // Safety: This is guaranteed to be the number of initialized (and read)
             // bytes due to the invariants provided by `ReadBuf::filled`.
             unsafe {
@@ -102,7 +106,6 @@ where
                     }
                     Err(_) => {
                         cx.waker().wake_by_ref();
-                        println!("Pending... up 1");
                         return Poll::Pending;
                     }
                 }
@@ -121,10 +124,8 @@ where
             let len = me.current_buffer.len();
             me.current_buffer.advance(size);
             me.current_buffer.reserve(capacity - len);
-            println!("Packet ready!");
             Poll::Ready(chunk_result)
         } else {
-            println!("Pending...");
             cx.waker().wake_by_ref();
             Poll::Pending
         }
