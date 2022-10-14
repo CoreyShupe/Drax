@@ -49,6 +49,111 @@ pub enum Tag {
 }
 
 impl Tag {
+    pub fn byte_tag<I: Into<u8>>(i: I) -> Tag {
+        Tag::ByteTag(i.into())
+    }
+    pub fn short_tag<I: Into<i16>>(i: I) -> Tag {
+        Tag::ShortTag(i.into())
+    }
+    pub fn int_tag<I: Into<i32>>(i: I) -> Tag {
+        Tag::IntTag(i.into())
+    }
+    pub fn long_tag<I: Into<i64>>(i: I) -> Tag {
+        Tag::LongTag(i.into())
+    }
+    pub fn float_tag<I: Into<f32>>(i: I) -> Tag {
+        Tag::FloatTag(i.into())
+    }
+    pub fn double_tag<I: Into<f64>>(i: I) -> Tag {
+        Tag::DoubleTag(i.into())
+    }
+    pub fn byte_array_tag<I: Into<Vec<u8>>>(i: I) -> Tag {
+        Tag::ByteArrayTag(i.into())
+    }
+    pub fn string_tag<I: Into<String>>(i: I) -> Tag {
+        Tag::StringTag(i.into())
+    }
+    pub fn int_array_tag<I: Into<Vec<i32>>>(i: I) -> Tag {
+        Tag::IntArrayTag(i.into())
+    }
+    pub fn long_array_tag<I: Into<Vec<i64>>>(i: I) -> Tag {
+        Tag::LongArrayTag(i.into())
+    }
+}
+
+impl From<u8> for Tag {
+    fn from(into: u8) -> Self {
+        Tag::byte_tag(into)
+    }
+}
+
+impl From<i16> for Tag {
+    fn from(into: i16) -> Self {
+        Tag::short_tag(into)
+    }
+}
+
+impl From<i32> for Tag {
+    fn from(into: i32) -> Self {
+        Tag::int_tag(into)
+    }
+}
+
+impl From<i64> for Tag {
+    fn from(into: i64) -> Self {
+        Tag::long_tag(into)
+    }
+}
+
+impl From<f32> for Tag {
+    fn from(into: f32) -> Self {
+        Tag::float_tag(into)
+    }
+}
+
+impl From<f64> for Tag {
+    fn from(into: f64) -> Self {
+        Tag::double_tag(into)
+    }
+}
+
+impl From<Vec<u8>> for Tag {
+    fn from(into: Vec<u8>) -> Self {
+        Tag::byte_array_tag(into)
+    }
+}
+
+impl From<String> for Tag {
+    fn from(into: String) -> Self {
+        Tag::string_tag(into)
+    }
+}
+
+impl From<&str> for Tag {
+    fn from(into: &str) -> Self {
+        Tag::string_tag(into)
+    }
+}
+
+impl From<&String> for Tag {
+    fn from(into: &String) -> Self {
+        Tag::string_tag(into)
+    }
+}
+
+impl From<Vec<i32>> for Tag {
+    fn from(into: Vec<i32>) -> Self {
+        Tag::int_array_tag(into)
+    }
+}
+
+impl From<Vec<i64>> for Tag {
+    fn from(into: Vec<i64>) -> Self {
+        Tag::long_array_tag(into)
+    }
+}
+
+impl Tag {
     pub fn get_bit(&self) -> u8 {
         match self {
             Tag::EndTag => 0,
@@ -362,8 +467,8 @@ impl CompoundTag {
         Default::default()
     }
 
-    pub fn put_tag(&mut self, location: String, tag: Tag) {
-        self.mappings.insert(location, tag);
+    pub fn put_tag<S: Into<String>>(&mut self, location: S, tag: Tag) {
+        self.mappings.insert(location.into(), tag);
     }
 
     pub fn get_tag(&self, location: &String) -> Option<&Tag> {
