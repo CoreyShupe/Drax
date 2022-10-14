@@ -32,7 +32,7 @@ impl NbtAccounter {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Tag {
     EndTag,
     ByteTag(u8),
@@ -476,7 +476,7 @@ fn load_tag<R: Read>(
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct CompoundTag {
     mappings: HashMap<String, Tag>,
 }
