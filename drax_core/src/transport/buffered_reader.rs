@@ -60,8 +60,8 @@ where
         let mut ready_size_inner = me.ready_size;
 
         log::trace!(
-            "Beginning pre-read check for packet with len: {}",
-            me.current_buffer.len()
+            "Beginning pre-read check for packet with len, size: {}, {:?}",
+            me.current_buffer.len(), ready_size_inner
         );
         match *ready_size_inner {
             None => {
@@ -74,17 +74,19 @@ where
                     *ready_size_inner = Some(size as usize);
                     me.current_buffer.advance(chunk_cursor.position() as usize);
                     let size = size as usize;
-                    let chunk_result = me
+                    if size <= me.current_buffer.len() {
+                        let chunk_result = me
                         .current_buffer
                         .chunks(size)
                         .next()
                         .map(|inner| me.pipeline.process(me.context, inner.to_vec()))
                         .unwrap_or_else(|| Error::cause("Failed to read buffer completely"));
-                    let capacity = me.current_buffer.capacity();
-                    let len = me.current_buffer.len();
-                    me.current_buffer.advance(size);
-                    me.current_buffer.reserve(capacity - len);
-                    return Poll::Ready(chunk_result);
+                        let capacity = me.current_buffer.capacity();
+                        let len = me.current_buffer.len();
+                        me.current_buffer.advance(size);
+                        me.current_buffer.reserve(capacity - len);
+                        return Poll::Ready(chunk_result);
+                    }
                 }
             }
             Some(size) if size <= me.current_buffer.len() => {
