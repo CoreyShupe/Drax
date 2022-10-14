@@ -17,6 +17,7 @@ use tokio::io::AsyncRead;
 
 #[derive(Debug)]
 pub enum Error {
+    EOF,
     Unknown(Option<String>),
     TokioError(tokio::io::Error),
     TryFromIntError(TryFromIntError),
@@ -38,6 +39,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Transport Error: ")?;
         match self {
+            Error::EOF => write!(f, "EOF"),
             Error::Unknown(potential_reason) => match potential_reason {
                 None => write!(f, "Unknown error"),
                 Some(reason) => write!(f, "Caught reason: {}", reason),

@@ -56,7 +56,6 @@ where
     type Output = crate::transport::Result<T>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        println!("Polling read.");
         let me = self.project();
         // poll read buffer mostly from read_buf in tokio AsyncReadExt
         {
@@ -78,10 +77,8 @@ where
                 buf.filled().len()
             };
 
-            println!("Read {} bytes", n);
-
             if n == 0 {
-                return Poll::Ready(Error::cause("EOF in read stream."));
+                return Poll::Ready(Err(Error::EOF));
             }
 
             // Safety: This is guaranteed to be the number of initialized (and read)
@@ -112,7 +109,6 @@ where
             }
             Some(size) => size,
         };
-        println!("Packet size: {}", size);
         if size <= me.current_buffer.len() {
             let chunk_result = me
                 .current_buffer

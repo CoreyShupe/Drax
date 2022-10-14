@@ -90,7 +90,6 @@ fn parse_continued_token_stream(args: &mut IntoIter) -> TokenStream {
     if let TokenTree::Group(group) = next {
         group.stream()
     } else {
-        println!("Next: {} => {:?}", next, next);
         panic!("Did not find a group following the = in an arg def.");
     }
 }
