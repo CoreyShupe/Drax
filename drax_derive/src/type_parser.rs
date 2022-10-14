@@ -260,10 +260,12 @@ pub(crate) struct WrappedType {
 pub(crate) enum RawType {
     VarInt,
     VarLong,
-    SizedVec(Box<WrappedType>),
-    Maybe(Box<WrappedType>),
+    ByteVec,
+    SizedByteVec,
     Vec(Box<WrappedType>),
+    SizedVec(Box<WrappedType>),
     Option(Box<WrappedType>),
+    Maybe(Box<WrappedType>),
     Primitive,
     String,
     UnknownObjectType,
@@ -306,7 +308,11 @@ impl RawType {
                         type_stream.append(TokenTree::Punct(Punct::new('<', Spacing::Alone)));
                         let (wrapped_next, mut stream) = Self::internal_from_token_stream(stream);
                         type_stream.append_all(wrapped_next.expanded_tokens.clone());
-                        let next = RawType::SizedVec(Box::new(wrapped_next));
+                        let next = if wrapped_next.expanded_tokens.to_string().eq("u8") {
+                            RawType::SizedByteVec
+                        } else {
+                            RawType::SizedVec(Box::new(wrapped_next))
+                        };
                         peek_next_punct(&mut stream, '>');
                         type_stream.append(TokenTree::Punct(Punct::new('>', Spacing::Alone)));
                         return (next.wrapped(type_stream), stream);
@@ -326,7 +332,11 @@ impl RawType {
                         type_stream.append(TokenTree::Punct(Punct::new('<', Spacing::Alone)));
                         let (wrapped_next, mut stream) = Self::internal_from_token_stream(stream);
                         type_stream.append_all(wrapped_next.expanded_tokens.clone());
-                        let next = RawType::Vec(Box::new(wrapped_next));
+                        let next = if wrapped_next.expanded_tokens.to_string().eq("u8") {
+                            RawType::ByteVec
+                        } else {
+                            RawType::Vec(Box::new(wrapped_next))
+                        };
                         peek_next_punct(&mut stream, '>');
                         type_stream.append(TokenTree::Punct(Punct::new('>', Spacing::Alone)));
                         return (next.wrapped(type_stream), stream);
@@ -401,6 +411,17 @@ pub(crate) fn create_type_ser(
         }
         RawType::VarLong => {
             quote::quote!(drax::extension::write_var_long_sync(#ident, context, writer)?;)
+        }
+        RawType::ByteVec => {
+            quote::quote!(std::io::Write::write_all(writer, #ident)?;)
+        }
+        RawType::SizedByteVec => {
+            quote::quote! {
+                {
+                    drax::extension::write_var_int_sync(#ident.len() as i32, context, writer)?;
+                    std::io::Write::write_all(writer, #ident)?;
+                }
+            }
         }
         RawType::SizedVec(inner) => match (**inner).raw_type {
             RawType::Primitive => {
@@ -542,6 +563,17 @@ pub(crate) fn create_type_sizer(
         RawType::VarLong => {
             quote::quote!(size += drax::extension::size_var_long(#ident, context)?;)
         }
+        RawType::ByteVec => {
+            quote::quote!(size += #ident.len();)
+        }
+        RawType::SizedByteVec => {
+            quote::quote! {
+                {
+                    size += drax::extension::size_var_int(#ident.len() as i32, context)?;
+                    size += #ident.len();
+                }
+            }
+        }
         RawType::SizedVec(inner) => match (**inner).raw_type {
             RawType::Primitive => {
                 let next_ident = Ident::new(&format!("{}_next", ident), Span::call_site());
@@ -681,6 +713,33 @@ pub(crate) fn create_type_de(
         }
         RawType::VarLong => {
             quote::quote!(drax::extension::read_var_long_sync(context, reader)?)
+        }
+        RawType::ByteVec => {
+            quote::quote! {
+                {
+                    let mut buffer = Vec::new();
+                    reader.read_to_end(&mut buffer)?;
+                    buffer
+                }
+            }
+        }
+        RawType::SizedByteVec => {
+            quote::quote! {
+                {
+                    let buffer_size = drax::extension::read_var_int_sync(context, reader)? as usize;
+                    let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
+                    let mut n_read = 0;
+                    while n_read < buffer.len() {
+                        n_read += std::io::Read::read(reader, &mut buffer[n_read..])?;
+                        if n_read == 0 {
+                            return drax::transport::Error::cause(
+                                    format!("Failed to read entire buffer, expected len: {}", buffer_size)
+                            );
+                        }
+                    }
+                    buffer
+                }
+            }
         }
         RawType::SizedVec(inner) => {
             let next_ident = Ident::new(&format!("{}_next", ident), Span::call_site());

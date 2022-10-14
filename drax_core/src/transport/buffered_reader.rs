@@ -61,7 +61,8 @@ where
 
         log::trace!(
             "Beginning pre-read check for packet with len, size: {}, {:?}",
-            me.current_buffer.len(), ready_size_inner
+            me.current_buffer.len(),
+            ready_size_inner
         );
         match *ready_size_inner {
             None => {
@@ -76,11 +77,11 @@ where
                     let size = size as usize;
                     if size <= me.current_buffer.len() {
                         let chunk_result = me
-                        .current_buffer
-                        .chunks(size)
-                        .next()
-                        .map(|inner| me.pipeline.process(me.context, inner.to_vec()))
-                        .unwrap_or_else(|| Error::cause("Failed to read buffer completely"));
+                            .current_buffer
+                            .chunks(size)
+                            .next()
+                            .map(|inner| me.pipeline.process(me.context, inner.to_vec()))
+                            .unwrap_or_else(|| Error::cause("Failed to read buffer completely"));
                         let capacity = me.current_buffer.capacity();
                         let len = me.current_buffer.len();
                         me.current_buffer.advance(size);
