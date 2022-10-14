@@ -1,3 +1,4 @@
+use std::collections::hash_map::Keys;
 use std::{
     collections::HashMap,
     io::{Read, Write},
@@ -473,6 +474,10 @@ impl CompoundTag {
 
     pub fn get_tag(&self, location: &String) -> Option<&Tag> {
         self.mappings.get(location)
+    }
+
+    pub fn tags(&self) -> Keys<'_, String, Tag> {
+        self.mappings.keys()
     }
 }
 
