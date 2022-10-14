@@ -116,7 +116,12 @@ where
                 let dst = unsafe { &mut *(dst as *mut _ as *mut [MaybeUninit<u8>]) };
                 let mut buf = ReadBuf::uninit(dst);
                 let ptr = buf.filled().as_ptr();
+
+                log::trace!("Read setup");
+
                 ready!(Pin::new(me.reader).poll_read(cx, &mut buf)?);
+
+                log::trace!("Backend read finished.");
 
                 // Ensure the pointer does not change from under us
                 assert_eq!(ptr, buf.filled().as_ptr());
