@@ -28,9 +28,3 @@ pub fn derive_bit_map_transport(item: TokenStream) -> TokenStream {
     };
     TokenStream::from(x)
 }
-
-#[proc_macro]
-pub fn nbt(item: TokenStream) -> TokenStream {
-    let mut into_iter = proc_macro2::TokenStream::from(item).into_iter();
-    nbt::read_tag_inner_internal(&mut into_iter)
-}

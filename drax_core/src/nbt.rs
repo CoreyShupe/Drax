@@ -154,6 +154,12 @@ impl From<Vec<i64>> for Tag {
     }
 }
 
+impl From<CompoundTag> for Tag {
+    fn from(ctg: CompoundTag) -> Self {
+        Tag::CompoundTag(ctg)
+    }
+}
+
 impl From<Vec<CompoundTag>> for Tag {
     fn from(into: Vec<CompoundTag>) -> Self {
         Tag::ListTag {
@@ -547,4 +553,16 @@ pub fn size_optional_nbt(tag: &Option<CompoundTag>) -> usize {
         Some(tag) => size_compound_tag(tag),
         None => 1,
     }
+}
+
+macro_rules! nbt {
+    ($($name:literal: $v:tt,)*) => {
+        {
+            let mut tag = $crate::nbt::CompoundTag::new();
+            $(
+                tag.put_tag($name, $crate::nbt::Tag::from($v));
+            )*
+            tag
+        }
+    };
 }
