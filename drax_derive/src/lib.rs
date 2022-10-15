@@ -1,7 +1,6 @@
 pub(crate) mod bitmap;
 pub(crate) mod r#enum;
 pub(crate) mod fields;
-mod nbt;
 pub(crate) mod r#struct;
 pub(crate) mod type_parser;
 

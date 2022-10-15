@@ -727,9 +727,9 @@ pub(crate) fn create_type_de(
             quote::quote! {
                 {
                     let buffer_size = drax::extension::read_var_int_sync(context, reader)? as usize;
-                    let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
+                    let mut buffer: Vec<u8> = vec![0u8; buffer_size];
                     let mut n_read = 0;
-                    while n_read < buffer.len() {
+                    while n_read < buffer_size {
                         n_read += std::io::Read::read(reader, &mut buffer[n_read..])?;
                         if n_read == 0 {
                             return drax::transport::Error::cause(

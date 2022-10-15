@@ -505,10 +505,7 @@ impl CompoundTag {
     }
 }
 
-pub fn read_nbt<R: Read>(
-    read: &mut R,
-    limit: u64,
-) -> crate::transport::Result<Option<CompoundTag>> {
+pub fn read_nbt<R: Read>(read: &mut R, limit: u64) -> Result<Option<CompoundTag>> {
     let mut accounter = NbtAccounter { limit, current: 0 };
     let bit = read.read_u8().map_err(Error::TokioError)?;
     if bit == 0 {
@@ -555,6 +552,7 @@ pub fn size_optional_nbt(tag: &Option<CompoundTag>) -> usize {
     }
 }
 
+#[macro_export]
 macro_rules! nbt {
     ($($name:literal: $v:tt,)*) => {
         {
