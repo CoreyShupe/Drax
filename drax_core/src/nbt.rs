@@ -558,7 +558,7 @@ macro_rules! ctg {
         $(($($true_tokens:tt)*))?
         $([$($vec_tokens:tt)*])?
         $({$($ctg_tokens:tt)*})?
-        $($v:literal)?
+        $($v:expr)?
     ),*) => {
         {
             let mut tag = $crate::nbt::CompoundTag::new();
