@@ -554,11 +554,21 @@ pub fn size_optional_nbt(tag: &Option<CompoundTag>) -> usize {
 
 #[macro_export]
 macro_rules! ctg {
-    ($($name:literal: $v:tt,)*) => {
+    ($($name:literal:
+        $(@$($true_tokens:tt)*)?
+        $([$($vec_tokens:tt)*])?
+        $({$($ctg_tokens:tt)*})?
+        $($v:literal)?
+    ),*) => {
         {
             let mut tag = $crate::nbt::CompoundTag::new();
             $(
-                tag.put_tag($name, $crate::nbt::Tag::from($v));
+                tag.put_tag($name, $crate::nbt::Tag::from(
+                    $($v)?
+                    $($($true_tokens)*)?
+                    $($crate::ctg! {$($ctg_tokens)*})?
+                    $(vec![$($vec_tokens)*])?
+                ));
             )*
             tag
         }
