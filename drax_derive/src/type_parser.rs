@@ -442,7 +442,7 @@ pub(crate) fn create_type_ser(
         RawType::ShortSizedByteVec => {
             quote::quote! {
                 {
-                    <u16 as drax::transport::DraxTransport>::write_from_transport(#ident.len() as i32, context, writer)?;
+                    <u16 as drax::transport::DraxTransport>::write_to_transport(&(#ident.len() as u16), context, writer)?;
                     std::io::Write::write_all(writer, #ident)?;
                 }
             }
@@ -480,7 +480,7 @@ pub(crate) fn create_type_ser(
                 let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
                 quote::quote! {
                     {
-                        <u16 as drax::transport::DraxTransport>::write_from_transport(#ident.len().try_into()? as u16, context, writer)?;
+                        <u16 as drax::transport::DraxTransport>::write_to_transport(#ident.len().try_into()? as u16, context, writer)?;
                         for #next_ident in #ident {
                             let #next_ident = *#next_ident;
                             #inner_type_ser
@@ -493,7 +493,7 @@ pub(crate) fn create_type_ser(
                 let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
                 quote::quote! {
                     {
-                        drax::transport::DraxTransport::write_to_transport(#ident.len().try_into()? as u16, context, writer)?;
+                        <u16 as drax::transport::DraxTransport>::write_to_transport(#ident.len().try_into()? as u16, context, writer)?;
                         for #next_ident in #ident {
                             #inner_type_ser
                         }
