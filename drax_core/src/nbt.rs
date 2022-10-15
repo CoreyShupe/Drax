@@ -553,7 +553,7 @@ pub fn size_optional_nbt(tag: &Option<CompoundTag>) -> usize {
 }
 
 #[macro_export]
-macro_rules! nbt {
+macro_rules! ctg {
     ($($name:literal: $v:tt,)*) => {
         {
             let mut tag = $crate::nbt::CompoundTag::new();
