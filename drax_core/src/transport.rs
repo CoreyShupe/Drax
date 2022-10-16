@@ -143,3 +143,27 @@ pub trait DraxTransport {
 
     fn precondition_size(&self, context: &mut TransportProcessorContext) -> Result<usize>;
 }
+
+pub trait WriteDraxTransport {
+    fn write_to_transport(
+        self,
+        context: &mut TransportProcessorContext,
+        writer: &mut Cursor<Vec<u8>>,
+    ) -> Result<()>;
+
+    fn precondition_size(self, context: &mut TransportProcessorContext) -> Result<usize>;
+}
+
+impl<T: DraxTransport> WriteDraxTransport for &T {
+    fn write_to_transport(
+        self,
+        context: &mut TransportProcessorContext,
+        writer: &mut Cursor<Vec<u8>>,
+    ) -> Result<()> {
+        T::write_to_transport(self, context, writer)
+    }
+
+    fn precondition_size(self, context: &mut TransportProcessorContext) -> Result<usize> {
+        T::precondition_size(self, context)
+    }
+}
