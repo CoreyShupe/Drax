@@ -144,7 +144,7 @@ pub trait DraxTransport {
     fn precondition_size(&self, context: &mut TransportProcessorContext) -> Result<usize>;
 }
 
-pub trait WriteDraxTransport {
+pub trait WriteDraxTransport: Sized {
     fn write_to_transport(
         &self,
         context: &mut TransportProcessorContext,
