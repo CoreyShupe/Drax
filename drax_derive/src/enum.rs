@@ -70,7 +70,7 @@ impl DraxVariant {
             .map(|x| match &x.type_ref {
                 WrappedType {
                     expanded_tokens: _,
-                    raw_type: RawType::Primitive,
+                    raw_type: RawType::Primitive | RawType::VarInt | RawType::VarLong,
                 } => {
                     let ident = &x.field_ident;
                     let ser = x.ser();
