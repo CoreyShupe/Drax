@@ -502,7 +502,7 @@ pub(crate) fn create_type_ser(
             }
         },
         RawType::Maybe(inner) => match (**inner).raw_type {
-            RawType::Primitive => {
+            RawType::Primitive | RawType::VarInt => {
                 let next_ident = Ident::new(&format!("{}_next", ident), Span::call_site());
                 let inner_type_ser = create_type_ser(&next_ident, inner, sheet);
                 quote::quote! {
@@ -688,7 +688,7 @@ pub(crate) fn create_type_sizer(
             }
         },
         RawType::Maybe(inner) => match (**inner).raw_type {
-            RawType::Primitive => {
+            RawType::Primitive | RawType::VarInt => {
                 let next_ident = Ident::new(&format!("{}_next", ident), Span::call_site());
                 let inner_type_sizer = create_type_sizer(&next_ident, inner, sheet);
                 quote::quote! {
