@@ -154,6 +154,12 @@ impl From<Vec<i64>> for Tag {
     }
 }
 
+impl From<CompoundTag> for Tag {
+    fn from(ctg: CompoundTag) -> Self {
+        Tag::CompoundTag(ctg)
+    }
+}
+
 impl From<Vec<CompoundTag>> for Tag {
     fn from(into: Vec<CompoundTag>) -> Self {
         Tag::ListTag {
@@ -499,10 +505,7 @@ impl CompoundTag {
     }
 }
 
-pub fn read_nbt<R: Read>(
-    read: &mut R,
-    limit: u64,
-) -> crate::transport::Result<Option<CompoundTag>> {
+pub fn read_nbt<R: Read>(read: &mut R, limit: u64) -> Result<Option<CompoundTag>> {
     let mut accounter = NbtAccounter { limit, current: 0 };
     let bit = read.read_u8().map_err(Error::TokioError)?;
     if bit == 0 {
@@ -547,4 +550,29 @@ pub fn size_optional_nbt(tag: &Option<CompoundTag>) -> usize {
         Some(tag) => size_compound_tag(tag),
         None => 1,
     }
+}
+
+#[macro_export]
+macro_rules! ctg {
+    ($($name:literal:
+        $(($($true_tokens:tt)*))?
+        $([$($vec_tokens:tt)*])?
+        $({$($ctg_tokens:tt)*})?
+        $($v:literal)?
+        $($i:ident)?
+    ),*) => {
+        {
+            let mut tag = $crate::nbt::CompoundTag::new();
+            $(
+                tag.put_tag($name, $crate::nbt::Tag::from(
+                    $($v)?
+                    $($i)?
+                    $($($true_tokens)*)?
+                    $($crate::ctg! {$($ctg_tokens)*})?
+                    $(vec![$($vec_tokens)*])?
+                ));
+            )*
+            tag
+        }
+    };
 }

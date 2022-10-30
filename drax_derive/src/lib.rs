@@ -1,7 +1,6 @@
 pub(crate) mod bitmap;
 pub(crate) mod r#enum;
 pub(crate) mod fields;
-mod nbt;
 pub(crate) mod r#struct;
 pub(crate) mod type_parser;
 
@@ -27,10 +26,4 @@ pub fn derive_bit_map_transport(item: TokenStream) -> TokenStream {
         _ => unimplemented!(),
     };
     TokenStream::from(x)
-}
-
-#[proc_macro]
-pub fn nbt(item: TokenStream) -> TokenStream {
-    let mut into_iter = proc_macro2::TokenStream::from(item).into_iter();
-    nbt::read_tag_inner_internal(&mut into_iter)
 }
