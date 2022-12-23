@@ -59,11 +59,6 @@ where
         let me = self.project();
         let mut ready_size_inner = me.ready_size;
 
-        log::trace!(
-            "Beginning pre-read check for packet with len, size: {}, {:?}",
-            me.current_buffer.len(),
-            ready_size_inner
-        );
         match *ready_size_inner {
             None => {
                 let mut chunk_cursor = Cursor::new(me.current_buffer.chunk());
@@ -71,7 +66,6 @@ where
                     &mut TransportProcessorContext::default(),
                     &mut chunk_cursor,
                 ) {
-                    log::trace!("Size ready!");
                     *ready_size_inner = Some(size as usize);
                     me.current_buffer.advance(chunk_cursor.position() as usize);
                     let size = size as usize;
@@ -120,18 +114,12 @@ where
                 let mut buf = ReadBuf::uninit(dst);
                 let ptr = buf.filled().as_ptr();
 
-                log::trace!("Read setup");
-
                 ready!(Pin::new(me.reader).poll_read(cx, &mut buf)?);
-
-                log::trace!("Backend read finished.");
 
                 // Ensure the pointer does not change from under us
                 assert_eq!(ptr, buf.filled().as_ptr());
                 buf.filled().len()
             };
-
-            log::trace!("Read bytes: {}", n);
 
             if n == 0 {
                 return Poll::Ready(Err(Error::EOF));

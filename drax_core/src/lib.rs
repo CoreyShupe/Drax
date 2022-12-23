@@ -23,14 +23,20 @@
 //! Alternative types such as `String` which might not necessarily fit as a primitive will exist
 //! as an extension.
 
-pub mod extension;
-pub mod nbt;
-pub mod prelude;
-pub mod primitives;
-pub mod transport;
+// pub mod extension;
+// pub mod nbt;
+// pub mod prelude;
+// pub mod primitives;
+pub mod t2;
+// pub mod transport;
 
 // stub types
 pub type VarInt = i32;
 pub type VarLong = i64;
 pub type SizedVec<T> = Vec<T>;
 pub type Maybe<T> = Option<T>;
+
+pub use t2::{
+    error::{ErrorType, TransportError, TransportErrorContext},
+    Result,
+};
