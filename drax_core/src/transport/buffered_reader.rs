@@ -36,6 +36,10 @@ impl<T2> DraxTransportPipeline<T2> {
     pub fn update_chain(&mut self, chain: ShareChain<Vec<u8>, T2>) {
         self.pipeline = chain;
     }
+
+    pub fn into_inner(self) -> BytesMut {
+        self.buffer
+    }
 }
 
 pin_project! {
