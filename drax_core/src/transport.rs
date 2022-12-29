@@ -1,146 +1,237 @@
-#[cfg(feature = "pipelines")]
-pub mod buffered_reader;
-#[cfg(feature = "pipelines")]
-pub mod buffered_writer;
+/// Utility for managing the transport layer with `AsyncRead` and `AsyncWrite` types.
+pub mod buffer;
+/// Compression and decompression wrappers over `AsyncRead` and `AsyncWrite` types.
+#[cfg(feature = "compression")]
+pub mod compression;
+/// Encryption and decryption wrappers over `AsyncRead` and `AsyncWrite` types.
 #[cfg(feature = "encryption")]
 pub mod encryption;
-#[cfg(feature = "pipelines")]
-pub mod frame;
-#[cfg(feature = "pipelines")]
+/// Defines a packet struct protocol for reading and writing packets of a generic structure.
+pub mod packet;
+/// Pipeline management for message reading and writing.
 pub mod pipeline;
 
-use std::fmt::{Display, Formatter};
-use std::io::{Cursor, Read};
-use std::num::TryFromIntError;
-use std::string::FromUtf8Error;
-use tokio::io::AsyncRead;
+/// A result type to capture the transport error type.
+pub type Result<T> = std::result::Result<T, error::TransportError>;
 
-#[derive(Debug)]
-pub enum Error {
-    EOF,
-    Unknown(Option<String>),
-    TokioError(tokio::io::Error),
-    TryFromIntError(TryFromIntError),
-    FromUtf8Error(FromUtf8Error),
-    SerdeJsonError(serde_json::Error),
-}
+/// A module defining all the error information for the transport layer.
+pub mod error {
+    use std::fmt::{Display, Formatter};
 
-impl Error {
-    pub fn cause<T, S: Into<String>>(into: S) -> Result<T> {
-        Err(Self::Unknown(Some(into.into())))
+    /// The error type for the transport layer.
+    #[derive(Debug)]
+    pub struct TransportError {
+        /// The reason for the error.
+        context: TransportErrorContext,
+        /// The cause of the error.
+        error_type: ErrorType,
     }
 
-    pub fn no_cause<T>() -> Result<T> {
-        Err(Self::Unknown(None))
-    }
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Transport Error: ")?;
-        match self {
-            Error::EOF => write!(f, "EOF"),
-            Error::Unknown(potential_reason) => match potential_reason {
-                None => write!(f, "Unknown error"),
-                Some(reason) => write!(f, "Caught reason: {}", reason),
-            },
-            Error::TokioError(err) => write!(f, "{}", err),
-            Error::TryFromIntError(err) => write!(f, "{}", err),
-            Error::FromUtf8Error(err) => write!(f, "{}", err),
-            Error::SerdeJsonError(err) => write!(f, "{}", err),
+    impl TransportError {
+        /// Creates a new error with the given context and error type.
+        ///
+        /// # Parameters
+        /// - `error_type`: The type of the error.
+        pub fn error(error_type: ErrorType) -> Self {
+            Self {
+                context: TransportErrorContext::Unknown,
+                error_type,
+            }
         }
-    }
-}
 
-impl std::error::Error for Error {}
-
-impl From<tokio::io::Error> for Error {
-    fn from(tokio_error: tokio::io::Error) -> Self {
-        Self::TokioError(tokio_error)
-    }
-}
-
-impl From<TryFromIntError> for Error {
-    fn from(try_from_int_error: TryFromIntError) -> Self {
-        Self::TryFromIntError(try_from_int_error)
-    }
-}
-
-impl From<FromUtf8Error> for Error {
-    fn from(from_utf8_error: FromUtf8Error) -> Self {
-        Self::FromUtf8Error(from_utf8_error)
-    }
-}
-
-impl From<serde_json::Error> for Error {
-    fn from(serde_json_error: serde_json::Error) -> Self {
-        Self::SerdeJsonError(serde_json_error)
-    }
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
-
-pub struct TransportProcessorContext {
-    data_map: crate::prelude::SendMap,
-}
-
-impl Default for TransportProcessorContext {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl TransportProcessorContext {
-    pub fn new() -> Self {
-        Self {
-            data_map: crate::prelude::SendMap::custom(),
+        /// Creates a new error with the given context and error type.
+        ///
+        /// # Parameters
+        /// * `context` - The context of the error.
+        /// * `error_type` - The type of the error.
+        pub fn with_context(context: TransportErrorContext, error_type: ErrorType) -> Self {
+            Self {
+                context,
+                error_type,
+            }
         }
     }
 
-    pub async fn read_next_var_int<R: AsyncRead + Unpin>(&mut self, read: &mut R) -> Result<i32> {
-        crate::extension::read_var_int(self, read).await
+    /// The type of the error.
+    #[derive(Debug)]
+    pub enum ErrorType {
+        /// The error is caused by something generic.
+        Generic,
+        /// The error is caused by an EOF.
+        EOF,
+        /// The error is caused by an unknown io error.
+        IoError(std::io::Error),
+        /// The error is caused by an unknown try from int error.
+        TryFromIntError(std::num::TryFromIntError),
+        /// The error is caused by an unknown from utf8 error.
+        FromUtf8Error(std::string::FromUtf8Error),
+        /// The error is caused by an unknown serde json error.
+        #[cfg(feature = "serde")]
+        SerdeJsonError(serde_json::Error),
     }
 
-    pub fn clear_data(&mut self) {
-        self.data_map.clear()
+    impl std::error::Error for TransportError {}
+
+    impl Display for TransportError {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(f, "Transport Error: (Context: {}) ", self.context)?;
+            match &self.error_type {
+                ErrorType::Generic => write!(f, "Generic Error"),
+                ErrorType::EOF => write!(f, "EOF"),
+                ErrorType::IoError(err) => write!(f, "IoError {}", err),
+                ErrorType::TryFromIntError(err) => write!(f, "TryFromIntError {}", err),
+                ErrorType::FromUtf8Error(err) => write!(f, "FromUtf8Error {}", err),
+                #[cfg(feature = "serde")]
+                ErrorType::SerdeJsonError(err) => write!(f, "SerdeJsonError {}", err),
+            }
+        }
     }
 
-    pub fn insert_data<T: crate::prelude::Key>(&mut self, item: T::Value)
-    where
-        <T as crate::prelude::Key>::Value: Send,
-    {
-        self.data_map.insert::<T>(item);
+    /// The context of the error.
+    #[derive(Debug)]
+    pub enum TransportErrorContext {
+        /// The error is caused by something unknown.
+        Unknown,
+        /// The error is caused by a yeet.
+        Yeeted,
+        /// The error is explainable by the given string.
+        Explainable(String),
     }
 
-    pub fn retrieve_data<T: crate::prelude::Key>(&self) -> Option<&T::Value>
-    where
-        T::Value: Send,
-    {
-        self.data_map.get::<T>()
+    impl From<&str> for TransportErrorContext {
+        fn from(str: &str) -> Self {
+            Self::Explainable(str.to_string())
+        }
     }
 
-    pub fn retrieve_data_mut<T: crate::prelude::Key>(&mut self) -> Option<&mut T::Value>
-    where
-        T::Value: Send,
-    {
-        self.data_map.get_mut::<T>()
+    impl From<&String> for TransportErrorContext {
+        fn from(str: &String) -> Self {
+            Self::Explainable(str.to_string())
+        }
     }
-}
 
-pub trait DraxTransport {
-    // ew?
-    fn write_to_transport(
-        &self,
-        context: &mut TransportProcessorContext,
-        writer: &mut Cursor<Vec<u8>>,
-    ) -> Result<()>;
+    impl From<String> for TransportErrorContext {
+        fn from(str: String) -> Self {
+            Self::Explainable(str)
+        }
+    }
 
-    fn read_from_transport<R: Read>(
-        context: &mut TransportProcessorContext,
-        read: &mut R,
-    ) -> Result<Self>
-    where
-        Self: Sized;
+    impl Display for TransportErrorContext {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match self {
+                TransportErrorContext::Unknown => write!(f, "Unknown"),
+                TransportErrorContext::Yeeted => write!(f, "Yeeted"),
+                TransportErrorContext::Explainable(reason) => write!(f, "`{}`", reason),
+            }
+        }
+    }
 
-    fn precondition_size(&self, context: &mut TransportProcessorContext) -> Result<usize>;
+    // from binds
+
+    impl From<std::io::Error> for TransportError {
+        fn from(value: std::io::Error) -> Self {
+            Self {
+                context: TransportErrorContext::Yeeted,
+                error_type: ErrorType::IoError(value),
+            }
+        }
+    }
+
+    impl From<std::io::Error> for ErrorType {
+        fn from(value: std::io::Error) -> Self {
+            Self::IoError(value)
+        }
+    }
+
+    impl From<std::num::TryFromIntError> for TransportError {
+        fn from(value: std::num::TryFromIntError) -> Self {
+            Self {
+                context: TransportErrorContext::Yeeted,
+                error_type: ErrorType::TryFromIntError(value),
+            }
+        }
+    }
+
+    impl From<std::num::TryFromIntError> for ErrorType {
+        fn from(value: std::num::TryFromIntError) -> Self {
+            Self::TryFromIntError(value)
+        }
+    }
+
+    impl From<std::string::FromUtf8Error> for TransportError {
+        fn from(value: std::string::FromUtf8Error) -> Self {
+            Self {
+                context: TransportErrorContext::Yeeted,
+                error_type: ErrorType::FromUtf8Error(value),
+            }
+        }
+    }
+
+    impl From<std::string::FromUtf8Error> for ErrorType {
+        fn from(value: std::string::FromUtf8Error) -> Self {
+            Self::FromUtf8Error(value)
+        }
+    }
+
+    impl From<serde_json::Error> for TransportError {
+        fn from(value: serde_json::Error) -> Self {
+            Self {
+                context: TransportErrorContext::Yeeted,
+                error_type: ErrorType::SerdeJsonError(value),
+            }
+        }
+    }
+
+    #[cfg(feature = "serde")]
+    impl From<serde_json::Error> for ErrorType {
+        fn from(value: serde_json::Error) -> Self {
+            Self::SerdeJsonError(value)
+        }
+    }
+
+    // throw macros
+
+    /// Creates a transport error using the given parameters.
+    #[macro_export]
+    macro_rules! err {
+        () => {
+            $crate::TransportError::error($crate::ErrorType::Generic)
+        };
+        ($error_type:expr) => {
+            $crate::TransportError::error(($error_type).into())
+        };
+        ($context:expr, $error_type:expr) => {
+            $crate::TransportError::with_context(($context).into(), ($error_type).into())
+        };
+    }
+
+    /// Creates a generic transport error with the given explanation as context.
+    #[macro_export]
+    macro_rules! err_explain {
+        ($context:expr) => {
+            $crate::TransportError::with_context(($context).into(), $crate::ErrorType::Generic)
+        };
+    }
+
+    /// Throws a transport error using the given parameters.
+    #[macro_export]
+    macro_rules! throw {
+        () => {
+            return Err($crate::err!());
+        };
+        ($error_type:expr) => {
+            return Err($crate::err!($error_type));
+        };
+        ($context:expr, $error_type:expr) => {
+            return Err($crate::err!($context, $error_type));
+        };
+    }
+
+    /// Throws a generic transport error with the given explanation as context.
+    #[macro_export]
+    macro_rules! throw_explain {
+        ($context:expr) => {
+            return Err($crate::err_explain!($context));
+        };
+    }
 }

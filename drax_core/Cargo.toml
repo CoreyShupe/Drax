@@ -6,21 +6,42 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-futures = "0.3.24"
-tokio = { version = "1.20.1", features = ["io-std", "io-util"], default-features = false }
-typemap = "0.3.3"
-cfb8 = { version = "0.8.1" }
-aes = { version = "0.8.2" }
+# Default dependencies
 pin-project-lite = "0.2.9"
 tokio-test = { version = "0.4.2", optional = true }
-flate2 = { version = "1.0.23", features = ["zlib"] }
-bytes = "1.2.1"
-serde = "1.0.144"
-serde_json = "1.0.85"
-uuid = "1.1.2"
-byteorder = "1.4.3"
-cesu8 = "1.1.0"
-proxy-protocol = "0.5.0"
+
+# Encryption
+cfb8 = { version = "0.8.1", optional = true }
+aes = { version = "0.8.2", optional = true }
+
+# NBT
+cesu8 = { version = "1.1.0", optional = true }
+
+# Compression
+async-compression = { version = "0.3.15", features = ["zlib"], optional = true }
+
+[dependencies.serde]
+version = "1"
+optional = true
+default-features = false
+
+[dependencies.serde_json]
+version = "1"
+optional = true
+features = ["std"]
+default-features = false
+
+[dependencies.tokio]
+version = "1.20.1"
+features = ["io-std", "io-util"]
+default-features = false
 
 [features]
-test = ["tokio/macros", "tokio/rt", "dep:tokio-test"]
+test = ["tokio/macros", "tokio/rt", "dep:tokio-test", "tokio/rt-multi-thread"]
+
+default = ["compression", "encryption", "serde"]
+
+compression = ["async-compression"]
+encryption = ["cfb8", "aes"]
+nbt = ["cesu8"]
+serde = ["dep:serde", "serde_json"]
