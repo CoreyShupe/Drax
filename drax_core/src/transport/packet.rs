@@ -3,6 +3,50 @@ use std::pin::Pin;
 
 use tokio::io::{AsyncRead, AsyncWrite};
 
+/// Defines a trait extension for `AsyncWrite` which allows quick encoding of packet components.
+/// This will likely be used as a `Cursor` extension for buffering packets for writing.
+pub trait PacketEncoder {
+    fn encode_packet<'a, T: PacketComponent>(
+        &'a mut self,
+        component: &'a T,
+    ) -> Pin<Box<dyn Future<Output = crate::Result<()>> + 'a>>;
+}
+
+impl<A> PacketEncoder for A
+where
+    A: AsyncWrite + Unpin,
+{
+    fn encode_packet<'a, T: PacketComponent>(
+        &'a mut self,
+        component: &'a T,
+    ) -> Pin<Box<dyn Future<Output = crate::Result<()>> + 'a>> {
+        T::encode(component, self)
+    }
+}
+
+/// Defines a trait extension for `AsyncRead` which allows quick decoding of packet components.
+pub trait PacketDecoder {
+    fn decode_packet<'a, T: PacketComponent>(
+        &'a mut self,
+    ) -> Pin<Box<dyn Future<Output = crate::Result<T>> + 'a>>
+    where
+        T: Sized;
+}
+
+impl<A> PacketDecoder for A
+where
+    A: AsyncRead + Unpin,
+{
+    fn decode_packet<'a, T: PacketComponent>(
+        &'a mut self,
+    ) -> Pin<Box<dyn Future<Output = crate::Result<T>> + 'a>>
+    where
+        T: Sized,
+    {
+        T::decode(self)
+    }
+}
+
 /// Defines a trait for defining a packet's component.
 pub trait PacketComponent {
     /// Decodes the packet component from the given reader.
@@ -195,6 +239,7 @@ pub mod vec {
     use crate::transport::buffer::{DraxReadExt, DraxWriteExt};
     use crate::transport::packet::{LimitedPacketComponent, PacketComponent};
     use std::future::Future;
+    use std::mem::MaybeUninit;
     use std::ops::Deref;
     use std::pin::Pin;
     use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -278,6 +323,65 @@ pub mod vec {
 
         fn size(&self) -> usize {
             self.len()
+        }
+    }
+
+    impl<T, const N: usize> PacketComponent for [T; N]
+    where
+        T: PacketComponent,
+    {
+        fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+            read: &'a mut A,
+        ) -> Pin<Box<dyn Future<Output = crate::Result<Self>> + 'a>>
+        where
+            Self: Sized,
+        {
+            Box::pin(async move {
+                let mut arr: [MaybeUninit<T>; N] = MaybeUninit::uninit_array();
+                for i in 0..N {
+                    arr[i] = MaybeUninit::new(T::decode(read).await?);
+                }
+                Ok(arr.map(|x| unsafe { x.assume_init() }))
+            })
+        }
+
+        fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+            &'a self,
+            write: &'a mut A,
+        ) -> Pin<Box<dyn Future<Output = crate::Result<()>> + 'a>> {
+            Box::pin(async move {
+                for i in 0..N {
+                    self[i].encode(write).await?;
+                }
+                Ok(())
+            })
+        }
+
+        fn size(&self) -> usize {
+            self.iter().map(|x| x.size()).sum()
+        }
+    }
+
+    impl<T, L, const N: usize> LimitedPacketComponent<L> for [T; N]
+    where
+        T: LimitedPacketComponent<L>,
+        L: Copy,
+    {
+        fn decode_with_limit<'a, A: AsyncRead + Unpin + ?Sized>(
+            read: &'a mut A,
+            limit: Option<L>,
+        ) -> Pin<Box<dyn Future<Output = crate::Result<Self>> + 'a>>
+        where
+            Self: Sized,
+            L: 'a,
+        {
+            Box::pin(async move {
+                let mut arr: [MaybeUninit<T>; N] = MaybeUninit::uninit_array();
+                for i in 0..N {
+                    arr[i] = MaybeUninit::new(T::decode_with_limit(read, limit).await?);
+                }
+                Ok(arr.map(|x| unsafe { x.assume_init() }))
+            })
         }
     }
 

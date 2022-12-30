@@ -1,3 +1,5 @@
+#![feature(maybe_uninit_uninit_array)]
+
 //! # Drax
 //!
 //! Drax is a library which supports framed packet reading and writing.
