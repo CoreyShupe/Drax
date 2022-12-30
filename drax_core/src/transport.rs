@@ -14,6 +14,7 @@ pub type Result<T> = std::result::Result<T, error::TransportError>;
 
 /// A module defining all the error information for the transport layer.
 pub mod error {
+    use cesu8::Cesu8DecodingError;
     use std::fmt::{Display, Formatter};
 
     /// The error type for the transport layer.
@@ -66,6 +67,9 @@ pub mod error {
         /// The error is caused by an unknown serde json error.
         #[cfg(feature = "serde")]
         SerdeJsonError(serde_json::Error),
+        /// Cesu 8 Decoding Error
+        #[cfg(feature = "nbt")]
+        Cesu8DecodingError(Cesu8DecodingError),
     }
 
     impl std::error::Error for TransportError {}
@@ -81,6 +85,8 @@ pub mod error {
                 ErrorType::FromUtf8Error(err) => write!(f, "FromUtf8Error {}", err),
                 #[cfg(feature = "serde")]
                 ErrorType::SerdeJsonError(err) => write!(f, "SerdeJsonError {}", err),
+                #[cfg(feature = "nbt")]
+                ErrorType::Cesu8DecodingError(err) => write!(f, "Cesu8DecodingError {}", err),
             }
         }
     }
@@ -126,27 +132,9 @@ pub mod error {
 
     // from binds
 
-    impl From<std::io::Error> for TransportError {
-        fn from(value: std::io::Error) -> Self {
-            Self {
-                context: TransportErrorContext::Yeeted,
-                error_type: ErrorType::IoError(value),
-            }
-        }
-    }
-
     impl From<std::io::Error> for ErrorType {
         fn from(value: std::io::Error) -> Self {
             Self::IoError(value)
-        }
-    }
-
-    impl From<std::num::TryFromIntError> for TransportError {
-        fn from(value: std::num::TryFromIntError) -> Self {
-            Self {
-                context: TransportErrorContext::Yeeted,
-                error_type: ErrorType::TryFromIntError(value),
-            }
         }
     }
 
@@ -156,27 +144,9 @@ pub mod error {
         }
     }
 
-    impl From<std::string::FromUtf8Error> for TransportError {
-        fn from(value: std::string::FromUtf8Error) -> Self {
-            Self {
-                context: TransportErrorContext::Yeeted,
-                error_type: ErrorType::FromUtf8Error(value),
-            }
-        }
-    }
-
     impl From<std::string::FromUtf8Error> for ErrorType {
         fn from(value: std::string::FromUtf8Error) -> Self {
             Self::FromUtf8Error(value)
-        }
-    }
-
-    impl From<serde_json::Error> for TransportError {
-        fn from(value: serde_json::Error) -> Self {
-            Self {
-                context: TransportErrorContext::Yeeted,
-                error_type: ErrorType::SerdeJsonError(value),
-            }
         }
     }
 
@@ -184,6 +154,25 @@ pub mod error {
     impl From<serde_json::Error> for ErrorType {
         fn from(value: serde_json::Error) -> Self {
             Self::SerdeJsonError(value)
+        }
+    }
+
+    #[cfg(feature = "nbt")]
+    impl From<Cesu8DecodingError> for ErrorType {
+        fn from(value: Cesu8DecodingError) -> Self {
+            ErrorType::Cesu8DecodingError(value)
+        }
+    }
+
+    impl<T> From<T> for TransportError
+    where
+        T: Into<ErrorType>,
+    {
+        fn from(value: T) -> Self {
+            Self {
+                context: TransportErrorContext::Yeeted,
+                error_type: value.into(),
+            }
         }
     }
 
@@ -215,13 +204,13 @@ pub mod error {
     #[macro_export]
     macro_rules! throw {
         () => {
-            return Err($crate::err!());
+            return Err($crate::err!())
         };
         ($error_type:expr) => {
-            return Err($crate::err!($error_type));
+            return Err($crate::err!($error_type))
         };
         ($context:expr, $error_type:expr) => {
-            return Err($crate::err!($context, $error_type));
+            return Err($crate::err!($context, $error_type))
         };
     }
 
@@ -229,7 +218,7 @@ pub mod error {
     #[macro_export]
     macro_rules! throw_explain {
         ($context:expr) => {
-            return Err($crate::err_explain!($context));
+            return Err($crate::err_explain!($context))
         };
     }
 }

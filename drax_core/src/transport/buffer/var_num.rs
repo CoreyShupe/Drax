@@ -1,4 +1,4 @@
-use crate::{err, err_explain, VarInt, VarLong};
+use crate::{err, err_explain};
 use pin_project_lite::pin_project;
 use std::future::Future;
 use std::marker::PhantomPinned;
@@ -143,7 +143,7 @@ macro_rules! declare_var_num_ext {
 }
 
 declare_var_num_ext!(
-    VarInt,
+    i32,
     u32,
     size_var_int,
     read_var_int,
@@ -155,7 +155,7 @@ declare_var_num_ext!(
 );
 
 declare_var_num_ext!(
-    VarLong,
+    i64,
     u64,
     size_var_long,
     read_var_long,

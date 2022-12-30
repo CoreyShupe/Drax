@@ -1,54 +1,28 @@
 pub mod var_num;
 
+use crate::err_explain;
 use crate::transport::buffer::var_num::{ReadVarInt, ReadVarLong, WriteVarInt, WriteVarLong};
-use crate::{err_explain, VarInt, VarLong};
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
-/// A reader wrapper that limits the number of bytes that can be read from the underlying reader.
-/// When the limit is reached it will simply return "0" bytes read.
-pub struct SoftReadLimiter<'a, A> {
-    reader: &'a mut A,
-    limit: VarInt,
-    current: usize,
+/// A trait extension for `AsyncRead` which limits a stream.
+pub trait Limiter {
+    /// Limits the stream to a certain number of bytes. Error on overflow.
+    fn hard_limit(&mut self, limit: usize) -> ReadLimiter<'_, Self>
+    where
+        Self: Sized;
 }
 
-impl<'a, A> SoftReadLimiter<'a, A> {
-    /// Creates a new soft read limiter which limits the number of bytes available from the buffer.
-    /// This wrapper will set a hard cap so you can create a "frame" without ever reading bytes
-    /// in to buffer the frame. This follows a "streamed" frame approach which should reduce the
-    /// number of allocations and copies of data.
-    ///
-    /// # Parameters
-    ///
-    /// * `reader` - The reader to wrap.
-    /// * `limit` - The maximum number of bytes that can be read from the underlying reader.
-    ///
-    /// # Returns
-    ///
-    /// A new soft read limiter.
-    ///
-    /// # Examples
-    ///
-    /// A `SoftReadLimiter` will never throw an error - it will simply block reads into more of the
-    /// buffer.
-    /// ```
-    /// # use std::io::Cursor;
-    /// # use tokio_test::{assert_err, assert_ok};
-    /// # use drax::transport::buffer::{SoftReadLimiter};
-    /// # use tokio::io::AsyncReadExt;
-    /// let mut cursor = Cursor::new(vec![1u8, 2, 3]);
-    /// let mut limiter = SoftReadLimiter::new(&mut cursor, 2);
-    /// let mut buf = [0; 3];
-    /// assert_eq!(tokio_test::block_on(async { assert_ok!(limiter.read(&mut buf).await) }), 2);
-    /// ```
-    pub fn new(reader: &'a mut A, limit: VarInt) -> Self {
-        Self {
-            reader,
-            limit,
-            current: 0,
-        }
+impl<T> Limiter for T
+where
+    T: AsyncRead + Unpin,
+{
+    fn hard_limit(&mut self, limit: usize) -> ReadLimiter<'_, Self>
+    where
+        Self: Sized,
+    {
+        ReadLimiter::new(self, limit)
     }
 }
 
@@ -60,7 +34,7 @@ impl<'a, A> SoftReadLimiter<'a, A> {
 /// that the entire specified number of bytes has been read from the reader.
 pub struct ReadLimiter<'a, A> {
     reader: &'a mut A,
-    limit: VarInt,
+    limit: usize,
     current: usize,
 }
 
@@ -104,7 +78,7 @@ impl<'a, A> ReadLimiter<'a, A> {
     /// assert_ok!(tokio_test::block_on(async { limiter.read_exact(&mut buf).await }));
     /// assert_eq!(buf, [1, 2]);
     /// ```
-    pub fn new(reader: &'a mut A, limit: VarInt) -> Self {
+    pub fn new(reader: &'a mut A, limit: usize) -> Self {
         Self {
             reader,
             limit,
@@ -162,41 +136,6 @@ where
         self.current += filled;
 
         Poll::Ready(Ok(()))
-    }
-}
-
-impl<'a, A> AsyncRead for SoftReadLimiter<'a, A>
-where
-    A: AsyncRead + Unpin,
-{
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        if self.limit == self.current as VarInt {
-            return Poll::Ready(Ok(()));
-        }
-
-        let filled_current = buf.filled().len();
-        if self.current + buf.remaining() > self.limit as usize {
-            let mut buf2 = ReadBuf::new(
-                buf.initialize_unfilled_to((self.limit as usize - self.current) as usize),
-            );
-            ready!(Pin::new(&mut *self.reader).poll_read(cx, &mut buf2))?;
-            let buf2_filled = buf2.filled().len();
-            drop(buf2);
-            buf.set_filled(buf2_filled);
-            let filled = buf.filled().len() - filled_current;
-
-            self.current += filled;
-            Poll::Ready(Ok(()))
-        } else {
-            ready!(Pin::new(&mut *self.reader).poll_read(cx, buf))?;
-            let filled = buf.filled().len() - filled_current;
-            self.current += filled;
-            Poll::Ready(Ok(()))
-        }
     }
 }
 
@@ -304,7 +243,7 @@ pub trait DraxWriteExt {
     /// - `writer`: A mutable reference to the writer to which the VarInt will be written. The writer must implement
     ///  the `AsyncWrite` trait.
     /// - `value`: The VarInt value to write.
-    fn write_var_int(&mut self, value: VarInt) -> WriteVarInt<'_, Self>;
+    fn write_var_int(&mut self, value: i32) -> WriteVarInt<'_, Self>;
 
     /// Writes a variable-length long integer (VarLong) to the underlying writer.
     ///
@@ -322,18 +261,18 @@ pub trait DraxWriteExt {
     /// - `writer`: A mutable reference to the writer to which the VarLong will be written. The writer must implement
     /// the `AsyncWrite` trait.
     /// - `value`: The VarLong value to write.
-    fn write_var_long(&mut self, value: VarLong) -> WriteVarLong<'_, Self>;
+    fn write_var_long(&mut self, value: i64) -> WriteVarLong<'_, Self>;
 }
 
 impl<T> DraxWriteExt for T
 where
     T: AsyncWrite + Unpin + ?Sized,
 {
-    fn write_var_int(&mut self, value: VarInt) -> WriteVarInt<'_, Self> {
+    fn write_var_int(&mut self, value: i32) -> WriteVarInt<'_, Self> {
         var_num::write_var_int(self, value)
     }
 
-    fn write_var_long(&mut self, value: VarLong) -> WriteVarLong<'_, Self> {
+    fn write_var_long(&mut self, value: i64) -> WriteVarLong<'_, Self> {
         var_num::write_var_long(self, value)
     }
 }
