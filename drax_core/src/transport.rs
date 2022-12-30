@@ -8,8 +8,6 @@ pub mod compression;
 pub mod encryption;
 /// Defines a packet struct protocol for reading and writing packets of a generic structure.
 pub mod packet;
-/// Pipeline management for message reading and writing.
-pub mod pipeline;
 
 /// A result type to capture the transport error type.
 pub type Result<T> = std::result::Result<T, error::TransportError>;

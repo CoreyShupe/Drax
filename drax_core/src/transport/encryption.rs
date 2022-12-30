@@ -227,8 +227,8 @@ mod tests {
         let key = [0x42; 16];
         let iv = [0x24; 16];
 
-        let mut encryption = Encryption::new(&key.into(), &iv.into());
-        let mut decryption = Decryption::new(&key.into(), &iv.into());
+        let encryption = Encryption::new(&key.into(), &iv.into());
+        let decryption = Decryption::new(&key.into(), &iv.into());
 
         let mut input_cursor = Cursor::new(vec![1, 2, 3, 4, 5]);
         let mut output_cursor = Cursor::new(vec![0; 5]).encrypt_stream(encryption);
