@@ -17,9 +17,6 @@ aes = { version = "0.8.2", optional = true }
 # NBT
 cesu8 = { version = "1.1.0", optional = true }
 
-# Compression
-async-compression = { version = "0.3.15", features = ["zlib"], optional = true }
-
 [dependencies.serde]
 version = "1"
 optional = true
@@ -39,9 +36,8 @@ default-features = false
 [features]
 test = ["tokio/macros", "tokio/rt", "dep:tokio-test", "tokio/rt-multi-thread"]
 
-default = ["compression", "encryption", "serde"]
+default = ["encryption", "serde"]
 
-compression = ["async-compression"]
 encryption = ["cfb8", "aes"]
 nbt = ["cesu8"]
 serde = ["dep:serde", "serde_json"]

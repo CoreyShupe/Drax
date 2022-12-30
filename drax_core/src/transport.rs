@@ -1,8 +1,5 @@
 /// Utility for managing the transport layer with `AsyncRead` and `AsyncWrite` types.
 pub mod buffer;
-/// Compression and decompression wrappers over `AsyncRead` and `AsyncWrite` types.
-#[cfg(feature = "compression")]
-pub mod compression;
 /// Encryption and decryption wrappers over `AsyncRead` and `AsyncWrite` types.
 #[cfg(feature = "encryption")]
 pub mod encryption;
@@ -14,7 +11,6 @@ pub type Result<T> = std::result::Result<T, error::TransportError>;
 
 /// A module defining all the error information for the transport layer.
 pub mod error {
-    use cesu8::Cesu8DecodingError;
     use std::fmt::{Display, Formatter};
 
     /// The error type for the transport layer.
@@ -69,7 +65,7 @@ pub mod error {
         SerdeJsonError(serde_json::Error),
         /// Cesu 8 Decoding Error
         #[cfg(feature = "nbt")]
-        Cesu8DecodingError(Cesu8DecodingError),
+        Cesu8DecodingError(cesu8::Cesu8DecodingError),
     }
 
     impl std::error::Error for TransportError {}
@@ -158,8 +154,8 @@ pub mod error {
     }
 
     #[cfg(feature = "nbt")]
-    impl From<Cesu8DecodingError> for ErrorType {
-        fn from(value: Cesu8DecodingError) -> Self {
+    impl From<cesu8::Cesu8DecodingError> for ErrorType {
+        fn from(value: cesu8::Cesu8DecodingError) -> Self {
             ErrorType::Cesu8DecodingError(value)
         }
     }

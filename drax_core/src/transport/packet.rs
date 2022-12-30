@@ -660,10 +660,9 @@ mod test {
     use crate::transport::buffer::var_num::size_var_int;
     use crate::transport::buffer::{DraxReadExt, DraxWriteExt};
     use crate::transport::packet::PacketComponent;
-    use crate::VarInt;
 
     pub struct Example {
-        v_int: VarInt,
+        v_int: i32,
         uu: u8,
     }
 
