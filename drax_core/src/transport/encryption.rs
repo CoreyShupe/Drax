@@ -9,7 +9,7 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 /// Encryption type alias for `cfb8::Encryptor<Aes128>`
 pub type Encryption = cfb8::Encryptor<Aes128>;
-/// Encryption type alias for `cfb8::Decryptor<Aes128>`
+/// Decryption type alias for `cfb8::Decryptor<Aes128>`
 pub type Decryption = cfb8::Decryptor<Aes128>;
 
 /// A trait extension for `AsyncWrite` which wraps the stream with an encryption cipher.

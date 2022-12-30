@@ -9,21 +9,22 @@ pub mod packet;
 /// A result type to capture the transport error type.
 pub type Result<T> = std::result::Result<T, error::TransportError>;
 
-/// A module defining all the error information for the transport layer.
+/// A module defining all the error types for the transport layer.
 pub mod error {
     use std::fmt::{Display, Formatter};
 
     /// The error type for the transport layer.
     #[derive(Debug)]
     pub struct TransportError {
-        /// The reason for the error.
+        /// The context around the error.
         context: TransportErrorContext,
         /// The cause of the error.
         error_type: ErrorType,
     }
 
     impl TransportError {
-        /// Creates a new error with the given context and error type.
+        /// Creates a new error with the given error type.
+        /// Defaults to use `TransportErrorContext::Unknown` for the context.
         ///
         /// # Parameters
         /// - `error_type`: The type of the error.
@@ -63,7 +64,7 @@ pub mod error {
         /// The error is caused by an unknown serde json error.
         #[cfg(feature = "serde")]
         SerdeJsonError(serde_json::Error),
-        /// Cesu 8 Decoding Error
+        /// Cesu 8 Decoding Error during NBT parsing.
         #[cfg(feature = "nbt")]
         Cesu8DecodingError(cesu8::Cesu8DecodingError),
     }

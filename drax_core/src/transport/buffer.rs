@@ -30,8 +30,7 @@ where
 ///
 /// The `ReadLimiter` struct wraps an `AsyncRead` object and provides a method for limiting the number of bytes
 /// that can be read from the underlying reader. When the limit is reached, any further read operations will return
-/// an error with the message "Read limit exceeded". The `ReadLimiter` struct also provides a method for checking
-/// that the entire specified number of bytes has been read from the reader.
+/// an error with the message "Read limit exceeded".
 pub struct ReadLimiter<'a, A> {
     reader: &'a mut A,
     limit: usize,
@@ -139,76 +138,9 @@ where
     }
 }
 
-/// Extension for reading common protocol types.
 pub trait DraxReadExt {
-    /// Reads a variable-length integer (VarInt) from the underlying reader.
-    ///
-    /// This function returns a future that reads a VarInt from the reader. A VarInt is an integer value that is
-    /// encoded using a variable-length encoding that uses fewer bytes to represent smaller values and more bytes to
-    /// represent larger values. This allows for more efficient storage and transmission of integers, especially when
-    /// the majority of values are small.
-    ///
-    /// To read a VarInt, the future reads one byte at a time from the reader and combines them using bit shifts to
-    /// form the final integer value. The process continues until a byte with the most significant bit (MSB) set to
-    /// `0` is encountered, which indicates the end of the VarInt.
-    ///
-    /// If the end of the reader is reached before the VarInt is fully read, the future will return an error of
-    /// type `ErrorType::EOF`. If the VarInt is too large to fit in the specified integer type, the future will
-    /// return an error with the message "VarInt too large".
-    ///
-    /// # Parameters
-    ///
-    /// - `reader`: A mutable reference to the reader from which the VarInt will be read. The reader must implement
-    ///   the `AsyncRead` trait.
-    ///
-    /// # Errors
-    ///
-    /// This function returns a future that may return an error when polled. The possible error values are:
-    ///
-    /// - `ErrorType::EOF`: If the end of the reader is reached before the VarInt is fully read.
-    /// - `ErrorType::Generic`: If the VarInt is too large to fit in the specified integer type.
-    ///
-    /// # Returns
-    ///
-    /// A future that resolves to the VarInt value or an error if the VarInt could not be read. The future
-    /// will return an error of type `ErrorType::EOF` if the end of the reader is reached before the VarInt
-    /// is fully read. The future will return an error with the message "VarInt too large" if the VarInt
-    /// is too large to fit in the specified integer type.
     fn read_var_int(&mut self) -> ReadVarInt<'_, Self>;
 
-    /// Reads a variable-length long integer (VarLong) from the underlying reader.
-    ///
-    /// This function returns a future that reads a VarLong from the reader. A VarLong is a long value that is
-    /// encoded using a variable-length encoding that uses fewer bytes to represent smaller values and more bytes to
-    /// represent larger values. This allows for more efficient storage and transmission of integers, especially when
-    /// the majority of values are small.
-    ///
-    /// To read a VarLong, the future reads one byte at a time from the reader and combines them using bit shifts to
-    /// form the final long value. The process continues until a byte with the most significant bit (MSB) set to
-    /// `0` is encountered, which indicates the end of the VarLong.
-    ///
-    /// If the end of the reader is reached before the VarLong is fully read, the future will return an error of
-    /// type `ErrorType::EOF`. If the VarLong is too large to fit in the specified long type, the future will
-    /// return an error with the message "VarLong too large".
-    ///
-    /// # Parameters
-    ///
-    /// - `reader`: A mutable reference to the reader from which the VarLong will be read. The reader must implement
-    ///  the `AsyncRead` trait.
-    ///
-    /// # Errors
-    ///
-    /// This function returns a future that may return an error when polled. The possible error values are:
-    ///
-    /// - `ErrorType::EOF`: If the end of the reader is reached before the VarLong is fully read.
-    /// - `ErrorType::Generic`: If the VarLong is too large to fit in the specified integer type.
-    ///
-    /// # Returns
-    ///
-    /// A future that resolves to the VarLong value or an error if the VarLong could not be read. The future
-    /// will return an error of type `ErrorType::EOF` if the end of the reader is reached before the VarLong
-    /// is fully read. The future will return an error with the message "VarLong too large" if the VarLong
-    /// is too large to fit in the specified long type.
     fn read_var_long(&mut self) -> ReadVarLong<'_, Self>;
 }
 
@@ -225,42 +157,9 @@ where
     }
 }
 
-/// Extension for writing common protocol types.
 pub trait DraxWriteExt {
-    /// Writes a variable-length integer (VarInt) to the underlying writer.
-    ///
-    /// This function returns a future that writes a VarInt to the writer. A VarInt is an integer value that is
-    /// encoded using a variable-length encoding that uses fewer bytes to represent smaller values and more bytes to
-    /// represent larger values. This allows for more efficient storage and transmission of integers, especially when
-    /// the majority of values are small.
-    ///
-    /// To write a VarInt, the future writes one byte at a time to the writer. The integer value is split into 7-bit
-    /// chunks and each chunk is written to the writer as a single byte. The most significant bit (MSB) of each byte
-    /// is set to `1` except for the last byte, which has the MSB set to `0` to indicate the end of the VarInt.
-    ///
-    /// # Parameters
-    ///
-    /// - `writer`: A mutable reference to the writer to which the VarInt will be written. The writer must implement
-    ///  the `AsyncWrite` trait.
-    /// - `value`: The VarInt value to write.
     fn write_var_int(&mut self, value: i32) -> WriteVarInt<'_, Self>;
 
-    /// Writes a variable-length long integer (VarLong) to the underlying writer.
-    ///
-    /// This function returns a future that writes a VarLong to the writer. A VarLong is a long value that is
-    /// encoded using a variable-length encoding that uses fewer bytes to represent smaller values and more bytes to
-    /// represent larger values. This allows for more efficient storage and transmission of integers, especially when
-    /// the majority of values are small.
-    ///
-    /// To write a VarLong, the future writes one byte at a time to the writer. The long value is split into 7-bit
-    /// chunks and each chunk is written to the writer as a single byte. The most significant bit (MSB) of each byte
-    /// is set to `1` except for the last byte, which has the MSB set to `0` to indicate the end of the VarLong.
-    ///
-    /// # Parameters
-    ///
-    /// - `writer`: A mutable reference to the writer to which the VarLong will be written. The writer must implement
-    /// the `AsyncWrite` trait.
-    /// - `value`: The VarLong value to write.
     fn write_var_long(&mut self, value: i64) -> WriteVarLong<'_, Self>;
 }
 

@@ -201,7 +201,14 @@ async fn skip_bytes<R: AsyncRead + Unpin + ?Sized, I: Into<u64>>(
     read: &mut R,
     i: I,
 ) -> crate::Result<()> {
-    let _ = tokio::io::copy(&mut read.take(i.into()), &mut tokio::io::sink()).await?;
+    let taken = i.into();
+    let a = tokio::io::copy(&mut read.take(taken), &mut tokio::io::sink()).await?;
+    if taken != a {
+        throw_explain!(format!(
+            "Failed to skip correct number of bytes, only skipped {} out of {}",
+            a, taken
+        ));
+    }
     Ok(())
 }
 

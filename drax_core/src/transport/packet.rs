@@ -47,7 +47,7 @@ where
     }
 }
 
-/// Defines a trait for defining a packet's component.
+/// Defines a structure that can be encoded, decoded, and sized.
 pub trait PacketComponent {
     /// Decodes the packet component from the given reader.
     fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
@@ -67,6 +67,10 @@ pub trait PacketComponent {
 }
 
 /// A trait defining a packet component which is limited in size.
+///
+/// # Parameters
+///
+/// * `Limit` - The type which the limit should be defined as.
 pub trait LimitedPacketComponent<Limit> {
     /// Decodes the packet component from the given reader.
     ///

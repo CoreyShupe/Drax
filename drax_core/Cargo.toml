@@ -41,3 +41,10 @@ default = ["encryption", "serde"]
 encryption = ["cfb8", "aes"]
 nbt = ["cesu8"]
 serde = ["dep:serde", "serde_json"]
+
+[dev-dependencies]
+criterion = { version = "0.4", features = ["async_tokio"] }
+
+[[bench]]
+name = "sample_function_benchmark"
+harness = false
