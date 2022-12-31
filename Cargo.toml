@@ -43,6 +43,8 @@ nbt = ["cesu8"]
 serde = ["dep:serde", "serde_json"]
 macros = []
 
+tcp-shield = []
+
 [dev-dependencies]
 criterion = { version = "0.4", features = ["async_tokio"] }
 

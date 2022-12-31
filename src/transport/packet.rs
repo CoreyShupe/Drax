@@ -132,7 +132,7 @@ pub mod macros {
             key: i32,
             match { <use key to create match query> }
             case { <key matcher> /* can use product_key here */ } => SomeVariant {
-                product_key = { <key value> }
+                product_key: product_type = $({ <key value> })?
                 // optional fields, can be completely empty
                 // fits into a "struct type, usually"
                 // tuple types should currently be "not allowed"
@@ -141,6 +141,51 @@ pub mod macros {
         }
     }
      */
+
+    #[macro_export]
+    macro_rules! expand_enum {
+        /*
+        cases to capture for keys:
+        type + none // de: type, ser: type, size: type
+        delegate + none // de: delegate, ser: delegate, size: delegate
+        delegate + type // de: delegate, ser: type, size: type
+        type + delegate // de: type, ser: delegate, size: delegate
+
+        fields use expand_field normally
+
+        de {
+            let key = <decode key>;
+            match <key_matcher> {
+                <key_matcher_case> => {
+                    <decode fields and create type>
+                }
+            }
+        }
+        ser/size {
+            ser/size key_matcher_case
+            ser/size fields
+        }
+         */
+        ($enum_name:ident {
+            $key_name:ident
+                $(: $key_type:ty)?
+                $(; $key_delegate_type:ty)?,
+            match $($key_matcher:tt)*,
+            $(
+                $($key_matcher_case:tt)*$(: $static_product_type:ty)?$(; $static_product_delegate_type:ty)? as $variant_name:ident {
+                    $static_product_type:ty,
+                    $(
+                        $(
+                        $field_name:ident
+                            $(: $field_type:ty)?
+                            $(; $delegate_type:ty)?
+                        ,
+                        )+
+                    )?
+                }
+            ),*
+        }) => {};
+    }
 
     #[macro_export]
     macro_rules! expand_field {
@@ -176,14 +221,16 @@ pub mod macros {
 
     #[macro_export]
     macro_rules! struct_packet_components {
-        (@internal @ $struct_name:ident) => {
+        (@internal $(#[$($tt:tt)*])* @ $struct_name:ident) => {
+            $(#[$($tt)*])*
             pub struct $struct_name;
         };
-        (@internal @expand $(
+        (@internal $(#[$($tt:tt)*])* @expand $(
             $field_name:ident
                 $(: $field_type:ty)?
                 $(; $delegate_type:ty)?,
         )+ @ $struct_name:ident) => {
+            $(#[$($tt)*])*
             pub struct $struct_name {
                 $(
                 pub $field_name:
@@ -192,7 +239,9 @@ pub mod macros {
                 )+
             }
         };
-        ($($struct_name:ident {
+        ($(
+            $(#[$($tt:tt)*])*
+            $struct_name:ident {
             $(
                 $(
                 $field_name:ident
@@ -202,7 +251,7 @@ pub mod macros {
                 )+
             )?
         })*) => {$(
-            $crate::struct_packet_components!(@internal
+            $crate::struct_packet_components!(@internal $(#[$($tt)*])*
                 $(
                     @expand $(
                         $field_name
@@ -235,10 +284,10 @@ pub mod macros {
                     })
                 }
 
-                fn encode_owned < 'a, A: $ crate::prelude::AsyncWrite + Unpin + ? Sized > (
+                fn encode_owned <'a, A: $crate::prelude::AsyncWrite + Unpin + ?Sized> (
                     &'a self,
                     __write: & 'a mut A,
-                ) -> std::pin::Pin < Box <dyn std::future::Future < Output = $crate::prelude::Result < () > > + 'a > > {
+                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = $crate::prelude::Result<()>> + 'a>> {
                     Box::pin(async move {
                         $($(
                         {
@@ -280,6 +329,54 @@ pub mod macros {
     }
 }
 
+#[cfg(feature = "tcp-shield")]
+mod tcp_shield {
+    use crate::prelude::{DraxReadExt, DraxWriteExt, OwnedPacketComponent, PacketComponent};
+    use crate::transport::packet::Size;
+    use std::future::Future;
+    use std::pin::Pin;
+    use tokio::io::{AsyncRead, AsyncWrite};
+
+    pub struct TcpShieldHeaderDelegate;
+
+    impl PacketComponent for TcpShieldHeaderDelegate {
+        type ComponentType = String;
+
+        fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+            read: &'a mut A,
+        ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>>
+        {
+            Box::pin(async move {
+                let _ = read.read_var_int().await?;
+                let out = String::decode(read).await?;
+                let _ = u16::decode(read).await?;
+                let _ = read.read_var_int().await?;
+                Ok(out)
+            })
+        }
+
+        fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+            component_ref: &'a Self::ComponentType,
+            write: &'a mut A,
+        ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+            Box::pin(async move {
+                write.write_var_int(0).await?;
+                String::encode(component_ref, write).await?;
+                u16::encode(&0, write).await?;
+                write.write_var_int(0x02).await?;
+                Ok(())
+            })
+        }
+
+        fn size(input: &Self::ComponentType) -> Size {
+            match input.size_owned() {
+                Size::Dynamic(x) => Size::Dynamic(x + 4),
+                Size::Constant(x) => Size::Constant(x + 4),
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::delegates::VarInt;
@@ -287,6 +384,7 @@ mod test {
     use std::io::Cursor;
 
     crate::struct_packet_components! {
+        #[derive(Debug, Eq, PartialEq)]
         Example {
             v_int; VarInt,
             uu: i32,
@@ -298,8 +396,10 @@ mod test {
         let mut v = vec![25, 0, 0, 0, 10];
         let mut cursor = Cursor::new(&mut v);
         let example = Example::decode_owned(&mut cursor).await?;
+        let expected = Example { v_int: 25, uu: 10 };
         assert_eq!(example.v_int, 25);
         assert_eq!(example.uu, 10);
+        assert_eq!(example, expected);
         Ok(())
     }
 

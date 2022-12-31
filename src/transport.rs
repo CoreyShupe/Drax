@@ -61,6 +61,8 @@ pub mod error {
         TryFromIntError(std::num::TryFromIntError),
         /// The error is caused by an unknown from utf8 error.
         FromUtf8Error(std::string::FromUtf8Error),
+        /// The error is caused by an unknown from str::utf8 error.
+        Utf8Error(std::str::Utf8Error),
         /// The error is caused by an unknown serde json error.
         #[cfg(feature = "serde")]
         SerdeJsonError(serde_json::Error),
@@ -80,6 +82,7 @@ pub mod error {
                 ErrorType::IoError(err) => write!(f, "IoError {}", err),
                 ErrorType::TryFromIntError(err) => write!(f, "TryFromIntError {}", err),
                 ErrorType::FromUtf8Error(err) => write!(f, "FromUtf8Error {}", err),
+                ErrorType::Utf8Error(err) => write!(f, "Utf8Error {}", err),
                 #[cfg(feature = "serde")]
                 ErrorType::SerdeJsonError(err) => write!(f, "SerdeJsonError {}", err),
                 #[cfg(feature = "nbt")]
@@ -144,6 +147,12 @@ pub mod error {
     impl From<std::string::FromUtf8Error> for ErrorType {
         fn from(value: std::string::FromUtf8Error) -> Self {
             Self::FromUtf8Error(value)
+        }
+    }
+
+    impl From<std::str::Utf8Error> for ErrorType {
+        fn from(value: std::str::Utf8Error) -> Self {
+            Self::Utf8Error(value)
         }
     }
 
