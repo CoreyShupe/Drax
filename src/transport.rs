@@ -179,13 +179,13 @@ pub mod error {
     #[macro_export]
     macro_rules! err {
         () => {
-            $crate::TransportError::error($crate::ErrorType::Generic)
+            $crate::prelude::TransportError::error($crate::ErrorType::Generic)
         };
         ($error_type:expr) => {
-            $crate::TransportError::error(($error_type).into())
+            $crate::prelude::TransportError::error(($error_type).into())
         };
         ($context:expr, $error_type:expr) => {
-            $crate::TransportError::with_context(($context).into(), ($error_type).into())
+            $crate::prelude::TransportError::with_context(($context).into(), ($error_type).into())
         };
     }
 
@@ -193,7 +193,10 @@ pub mod error {
     #[macro_export]
     macro_rules! err_explain {
         ($context:expr) => {
-            $crate::TransportError::with_context(($context).into(), $crate::ErrorType::Generic)
+            $crate::prelude::TransportError::with_context(
+                ($context).into(),
+                $crate::prelude::ErrorType::Generic,
+            )
         };
     }
 

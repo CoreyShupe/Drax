@@ -12,70 +12,6 @@ pub type Encryption = cfb8::Encryptor<Aes128>;
 /// Decryption type alias for `cfb8::Decryptor<Aes128>`
 pub type Decryption = cfb8::Decryptor<Aes128>;
 
-/// A trait extension for `AsyncWrite` which wraps the stream with an encryption cipher.
-pub trait Encryptable {
-    /// Does not encrypt the stream, simply passes through all the bytes.
-    fn no_crypt_wrap(self) -> EncryptedWriter<Self>
-    where
-        Self: Sized;
-
-    /// Wraps the stream with an encryption cipher.
-    fn encrypt_stream(self, encryption: Encryption) -> EncryptedWriter<Self>
-    where
-        Self: Sized;
-}
-
-impl<T> Encryptable for T
-where
-    T: AsyncWrite,
-{
-    fn no_crypt_wrap(self) -> EncryptedWriter<Self>
-    where
-        Self: Sized,
-    {
-        EncryptedWriter::noop(self)
-    }
-
-    fn encrypt_stream(self, encryption: Encryption) -> EncryptedWriter<Self>
-    where
-        Self: Sized,
-    {
-        EncryptedWriter::new(self, encryption)
-    }
-}
-
-/// A trait extension for `AsyncRead` which wraps the stream with a decryption cipher.
-pub trait Decryptable {
-    /// Does not decrypt the stream, simply passes through all the bytes.
-    fn no_crypt_wrap(self) -> DecryptRead<Self>
-    where
-        Self: Sized;
-
-    /// Wraps the stream with a decryption cipher.
-    fn decrypt_stream(self, decryption: Decryption) -> DecryptRead<Self>
-    where
-        Self: Sized;
-}
-
-impl<T> Decryptable for T
-where
-    T: AsyncRead,
-{
-    fn no_crypt_wrap(self) -> DecryptRead<Self>
-    where
-        Self: Sized,
-    {
-        DecryptRead::noop(self)
-    }
-
-    fn decrypt_stream(self, decryption: Decryption) -> DecryptRead<Self>
-    where
-        Self: Sized,
-    {
-        DecryptRead::new(self, decryption)
-    }
-}
-
 pin_project! {
     /// A writer wrapper which encrypts all written data.
     pub struct EncryptedWriter<W> {
@@ -215,7 +151,8 @@ fn decrypt(mut decryption: Pin<&mut Decryption>, data: InOutBuf<'_, '_, u8>) {
 
 #[cfg(test)]
 mod tests {
-    use crate::transport::encryption::{Decryptable, Decryption, Encryptable, Encryption};
+    use crate::prelude::{DraxReadExt, DraxWriteExt};
+    use crate::transport::encryption::{Decryption, Encryption};
     use cfb8::cipher::KeyIvInit;
     use std::io::Cursor;
     use std::pin::Pin;

@@ -21,12 +21,21 @@
 #[cfg(feature = "nbt")]
 pub mod nbt;
 
+/// Includes common types used throughout the transport layer
+pub mod prelude;
+
 /// This module contains all the types and traits necessary for building out a transport layer.
 /// Provides a method of directly interacting with the transport layer. A soft-wrapper will be
 /// available during serialization and deserialization to account for common types.
 pub mod transport;
 
-pub use transport::{
-    error::{ErrorType, TransportError, TransportErrorContext},
-    Result,
-};
+/// Module for quickly accessing builtin delegates.
+pub mod delegates {
+    #[cfg(feature = "serde")]
+    pub use crate::transport::packet::serde_json::JsonDelegate;
+    pub use crate::transport::packet::{
+        option::{Maybe, MaybeDelegate},
+        primitive::{VarInt, VarLong},
+        vec::{ByteDrain, DelegateSlice, VecDelegate},
+    };
+}

@@ -14,7 +14,7 @@ pub struct NbtAccounter {
 }
 
 impl NbtAccounter {
-    fn account_bits(&mut self, bits: u64) -> crate::Result<()> {
+    fn account_bits(&mut self, bits: u64) -> crate::prelude::Result<()> {
         match self.current.checked_add(bits) {
             Some(next) => {
                 if next > self.limit {
@@ -200,7 +200,7 @@ impl Tag {
 async fn skip_bytes<R: AsyncRead + Unpin + ?Sized, I: Into<u64>>(
     read: &mut R,
     i: I,
-) -> crate::Result<()> {
+) -> crate::prelude::Result<()> {
     let taken = i.into();
     let a = tokio::io::copy(&mut read.take(taken), &mut tokio::io::sink()).await?;
     if taken != a {
@@ -212,13 +212,15 @@ async fn skip_bytes<R: AsyncRead + Unpin + ?Sized, I: Into<u64>>(
     Ok(())
 }
 
-async fn skip_string<R: AsyncRead + Unpin + ?Sized>(read: &mut R) -> crate::Result<()> {
+async fn skip_string<R: AsyncRead + Unpin + ?Sized>(read: &mut R) -> crate::prelude::Result<()> {
     let skipped = u16::decode(read).await?;
     skip_bytes(read, skipped).await?;
     Ok(())
 }
 
-async fn read_string<R: AsyncRead + Unpin + ?Sized>(read: &mut R) -> crate::Result<String> {
+async fn read_string<R: AsyncRead + Unpin + ?Sized>(
+    read: &mut R,
+) -> crate::prelude::Result<String> {
     let str_len = u16::decode(read).await?;
     if str_len == 0 {
         return Ok(String::new());
@@ -241,7 +243,7 @@ fn size_string(string: &str) -> usize {
 async fn write_string<W: AsyncWrite + Unpin + ?Sized>(
     write: &mut W,
     string: &String,
-) -> crate::Result<()> {
+) -> crate::prelude::Result<()> {
     write.write_u16(string.len() as u16).await?;
     write.write_all(&cesu8::to_java_cesu8(string)).await?;
     Ok(())
@@ -250,7 +252,7 @@ async fn write_string<W: AsyncWrite + Unpin + ?Sized>(
 async fn write_compound_tag<W: AsyncWrite + Unpin + ?Sized>(
     tag: &CompoundTag,
     write: &mut W,
-) -> crate::Result<()> {
+) -> crate::prelude::Result<()> {
     for (key, value) in &tag.mappings {
         let id = value.get_bit();
         write.write_u8(id).await?;
@@ -280,7 +282,7 @@ fn size_compound_tag(tag: &CompoundTag) -> usize {
 fn write_tag<'a, W: AsyncWrite + Unpin + ?Sized>(
     tag: &'a Tag,
     write: &'a mut W,
-) -> Pin<Box<dyn Future<Output = crate::Result<()>> + 'a>> {
+) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
     Box::pin(async move {
         match tag {
             Tag::EndTag => Ok(()),
@@ -352,7 +354,7 @@ fn load_tag<'a, R: AsyncRead + Unpin + ?Sized>(
     read: &'a mut R,
     depth: usize,
     accounter: &'a mut NbtAccounter,
-) -> Pin<Box<dyn Future<Output = crate::Result<Tag>> + 'a>> {
+) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Tag>> + 'a>> {
     Box::pin(async move {
         match tag_bit {
             0 => {
@@ -489,7 +491,7 @@ impl CompoundTag {
 pub async fn read_nbt<R: AsyncRead + Unpin + ?Sized>(
     read: &mut R,
     limit: u64,
-) -> crate::Result<Option<CompoundTag>> {
+) -> crate::prelude::Result<Option<CompoundTag>> {
     let mut accounter = NbtAccounter { limit, current: 0 };
     let bit = read.read_u8().await?;
     if bit == 0 {
@@ -507,7 +509,7 @@ pub async fn read_nbt<R: AsyncRead + Unpin + ?Sized>(
 pub async fn write_nbt<W: AsyncWrite + Unpin + ?Sized>(
     tag: &CompoundTag,
     writer: &mut W,
-) -> crate::Result<()> {
+) -> crate::prelude::Result<()> {
     writer.write_u8(COMPOUND_TAG_BIT).await?;
     write_string(writer, &String::new()).await?;
     write_compound_tag(tag, writer).await
@@ -516,7 +518,7 @@ pub async fn write_nbt<W: AsyncWrite + Unpin + ?Sized>(
 pub async fn write_optional_nbt<W: AsyncWrite + Unpin + ?Sized>(
     tag: &Option<CompoundTag>,
     writer: &mut W,
-) -> crate::Result<()> {
+) -> crate::prelude::Result<()> {
     match tag.as_ref() {
         Some(tag) => {
             writer.write_u8(COMPOUND_TAG_BIT).await?;
