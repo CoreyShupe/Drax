@@ -123,84 +123,51 @@ pub mod vec;
 
 #[cfg(feature = "macros")]
 pub mod macros {
-    /*
-    enum template:
-
-    enum_packet_components {
-        TestEnum {
-            key; delegate VarInt,
-            key: i32,
-            match { <use key to create match query> }
-            case { <key matcher> /* can use product_key here */ } => SomeVariant {
-                product_key: product_type = $({ <key value> })?
-                // optional fields, can be completely empty
-                // fits into a "struct type, usually"
-                // tuple types should currently be "not allowed"
-                // everything should be named
-            }
-        }
-    }
-     */
-
     #[macro_export]
-    macro_rules! expand_enum {
-        /*
-        de {
-            let key = <decode key>;
-            match <key_matcher> {
-                <key_matcher_case> => {
-                    <decode fields and create type>
-                }
-            }
-        }
-        ser/size {
-            ser/size key_matcher_case
-            ser/size fields
-        }
-         */
+    macro_rules! enum_packet_components {
         ($w_ident:ident, $field_name:ident @ser : $ty:ty) => {
-            $crate::expand_field(@ser $field_name: $ty);
+            $crate::expand_field!(@ser $w_ident, $field_name: $ty)
         };
         ($w_ident:ident, $field_name:ident @ser ; $ty:ty) => {
-            $crate::expand_field(@ser $field_name; $ty);
+            $crate::expand_field!(@ser $w_ident, $field_name; $ty)
         };
         ($w_ident:ident, $field_name:ident @ser : $__:ty
-                $(: $ty:ty)?
-                $(; $dty:ty)?
+            $(: $ty:ty)?
+            $(; $dty:ty)?
         ) => {
-            $crate::expand_field(@ser $field_name$(: $ty)?$(; $dty)?);
+            $crate::expand_field!(@ser $w_ident, $field_name$(: $ty)?$(; $dty)?)
         };
         ($w_ident:ident, $field_name:ident @ser ; $__:ty
-                $(: $ty:ty)?
-                $(; $dty:ty)?
+            $(: $ty:ty)?
+            $(; $dty:ty)?
         ) => {
-            $crate::expand_field(@ser $field_name$(: $ty)?$(; $dty)?);
+            $crate::expand_field!(@ser $w_ident, $field_name$(: $ty)?$(; $dty)?)
         };
         ($c_counter:ident, $d_counter:ident, $field_name:ident @size : $ty:ty) => {
-            $crate::expand_field(@size $c_counter, $d_counter, $field_name: $ty);
+            $crate::expand_field!(@size $c_counter, $d_counter, $field_name: $ty)
         };
         ($c_counter:ident, $d_counter:ident, $field_name:ident @size ; $ty:ty) => {
-            $crate::expand_field(@size $c_counter, $d_counter, $field_name; $ty);
+            $crate::expand_field!(@size $c_counter, $d_counter, $field_name; $ty)
         };
         ($c_counter:ident, $d_counter:ident, $field_name:ident @size : $__:ty
-                $(: $ty:ty)?
-                $(; $dty:ty)?
+            $(: $ty:ty)?
+            $(; $dty:ty)?
         ) => {
-            $crate::expand_field(@size $c_counter, $d_counter, $field_name$(: $ty)?$(; $dty)?);
+            $crate::expand_field!(@size $c_counter, $d_counter, $field_name$(: $ty)?$(; $dty)?);
         };
         ($c_counter:ident, $d_counter:ident, $field_name:ident @size ; $__:ty
-                $(: $ty:ty)?
-                $(; $dty:ty)?
+            $(: $ty:ty)?
+            $(; $dty:ty)?
         ) => {
-            $crate::expand_field(@size $c_counter, $d_counter, $field_name$(: $ty)?$(; $dty)?);
+            $crate::expand_field!(@size $c_counter, $d_counter, $field_name$(: $ty)?$(; $dty)?)
         };
         ($(#[$($tt:tt)*])* $enum_name:ident {
             $key_name:ident
                 $(: $key_type:ty)?
                 $(; $key_delegate_type:ty)?,
-            match $($key_matcher:tt)*,
+            match { $($key_matcher:tt)* },
             $(
-                $($key_matcher_case:tt)+$(: $static_product_type:ty)?$(; $static_product_delegate_type:ty)? as $variant_name:ident {
+                $key_matcher_case:literal $(: $static_product_type:ty)?$(; $static_product_delegate_type:ty)? as $variant_name:ident {
                     $(
                         $(
                         $field_name:ident
@@ -216,9 +183,11 @@ pub mod macros {
             pub enum $enum_name {
                 $(
                     $variant_name$({
-                            $(
-                            $field_name: $field_type,
-                            )+
+                        $(
+                        $field_name:
+                            $($field_type)?
+                            $(<$delegate_type as $crate::transport::packet::PacketComponent>::ComponentType)?,
+                        )+
                     })?,
                 )*
             }
@@ -226,18 +195,30 @@ pub mod macros {
             impl $crate::prelude::OwnedPacketComponent for $enum_name {
                 fn decode_owned<'a, A: $crate::prelude::AsyncRead + Unpin + ?Sized>(
                     __read: &'a mut A,
-                ) -> std::pin::Pin<Box<dyn std::futures::Future<Output = crate::prelude::Result<Self>> + 'a>>
+                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = crate::prelude::Result<Self>> + 'a>>
                 where
                     Self: Sized
                 {
                     Box::pin(async move {
                         $crate::expand_field!(@de __read, $key_name
-                                $(: $key_type)?
-                                $(; $key_delegate_type)?
+                            $(: $key_type)?
+                            $(; $key_delegate_type)?
                         );
 
                         match $($key_matcher)* {
-                            $($key_matcher_case)+
+                            $(
+                            $key_matcher_case => {
+                                $($(
+                                $crate::expand_field!(@de __read, $field_name
+                                    $(: $field_type)?
+                                    $(; $delegate_type)?
+                                );
+                                )+)?
+                                Ok(Self::$variant_name $({
+                                    $($field_name,)*
+                                })?)
+                            }
+                            )*
                             _ => $crate::throw_explain!(format!("Failed to decode key {} for type {}", $key_name, stringify!($enum_name))),
                         }
                     })
@@ -246,29 +227,44 @@ pub mod macros {
                 fn encode_owned<'a, A: $crate::prelude::AsyncWrite + Unpin + ?Sized>(
                     &'a self,
                     __write: &'a mut A,
-                ) -> std::pin::Pin<Box<dyn std::futures::Future<Output = crate::prelude::Result<()>> + 'a>>
+                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = crate::prelude::Result<()>> + 'a>>
                 {
                     Box::pin(async move {
+                        macro_rules! expand_key_types {
+                            (
+                                $$write_ref:ident,
+                                $$key_ref:ident
+                                $$(:$$static_product_type:ty)?
+                                $$(;$$static_product_delegate_type:ty)?
+                            ) => {
+                                $crate::enum_packet_components! {
+                                    $$write_ref, $$key_ref @ser
+                                    $(:$key_type)?
+                                    $(;$key_delegate_type)?
+                                    $$(:$$static_product_type)?
+                                    $$(;$$static_product_delegate_type)?
+                                }
+                            }
+                        }
+
                         match &self {
                             $(
                                 Self::$variant_name $({$(
                                     $field_name,
                                 )+})? => {
                                     {
-                                        let key = $($key_matcher_case)+;
+                                        let key = $key_matcher_case;
                                         let key_ref = &key;
-                                        $crate::expand_enum!(
-                                            __write, key_ref @ser
-                                            $(:$key_type)?
-                                            $(;$key_delegate_type)?
+                                        expand_key_types!(
+                                            __write, key_ref
                                             $(:$static_product_type)?
                                             $(;$static_product_delegate_type)?
-                                        );
+                                        )
                                     }
                                     $($(
-                                        $crate::expand_field!(@ser __write, __temp
-                                                $(: $field_type)?
-                                                $(; $delegate_type)?
+                                        $crate::expand_field!(@ser __write, $field_name
+                                            $(: $field_type)?
+                                            $(; $delegate_type)?
                                         );
                                     )+)?
                                     Ok(())
@@ -280,7 +276,55 @@ pub mod macros {
 
                 fn size_owned(&self) -> $crate::prelude::Size
                 {
+                    macro_rules! expand_key_types {
+                        (
+                            $$constant_counter:ident,
+                            $$dynamic_counter:ident,
+                            $$key_ref:ident
+                            $$(:$$static_product_type:ty)?
+                            $$(;$$static_product_delegate_type:ty)?
+                        ) => {
+                            $crate::enum_packet_components! {
+                                $$constant_counter, $$dynamic_counter, $$key_ref @size
+                                $(:$key_type)?
+                                $(;$key_delegate_type)?
+                                $$(:$$static_product_type)?
+                                $$(;$$static_product_delegate_type)?
+                            }
+                        }
+                    }
 
+                    let mut constant_counter = 0;
+                    let mut dynamic_counter = 0;
+                    match &self {
+                        $(
+                        Self::$variant_name $({$(
+                        $field_name,
+                        )+})? => {
+                            {
+                                let key = $key_matcher_case;
+                                let key_ref = &key;
+                                expand_key_types!(
+                                    constant_counter, dynamic_counter, key_ref
+                                    $(:$static_product_type)?
+                                    $(;$static_product_delegate_type)?
+                                )
+                            }
+                            $($(
+                            $crate::expand_field!(@size constant_counter, dynamic_counter, $field_name
+                                $(: $field_type)?
+                                $(; $delegate_type)?
+                            );
+                            )+)?
+                        }
+                        )*
+                    }
+
+                    if constant_counter == dynamic_counter {
+                        $crate::transport::packet::Size::Constant(constant_counter)
+                    } else {
+                        $crate::transport::packet::Size::Dynamic(dynamic_counter)
+                    }
                 }
             }
         };
@@ -293,7 +337,7 @@ pub mod macros {
                 $(; $delegate_type:ty)?) => {
             $(<$field_type as $crate::prelude::OwnedPacketComponent>::encode_owned($field_name, $w_ident))?
             $(<$delegate_type as $crate::prelude::PacketComponent>::encode($field_name, $w_ident))?
-            .await?;
+            .await?
         };
         (@de $r_ident:ident, $field_name:ident
                 $(: $field_type:ty)?
@@ -490,6 +534,22 @@ mod test {
         }
     }
 
+    crate::enum_packet_components! {
+        #[derive(Debug, Eq, PartialEq)]
+        ExampleEnum {
+            key; VarInt,
+            match {key},
+            0 as Variant1 {
+                v_int; VarInt,
+                reg_int: i32,
+            },
+            1 as Variant2 {
+                reg_int: i32,
+                v_int; VarInt,
+            }
+        }
+    }
+
     #[tokio::test]
     async fn test_decode_packet() -> crate::prelude::Result<()> {
         let mut v = vec![25, 0, 0, 0, 10];
@@ -524,6 +584,64 @@ mod test {
             uu: 10i32,
         };
         assert_eq!(Example::size_owned(&example), Size::Dynamic(5));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_decode_enum_packet() -> crate::prelude::Result<()> {
+        let mut v = vec![0, 25, 0, 0, 0, 10];
+        let mut cursor = Cursor::new(&mut v);
+        let example = ExampleEnum::decode_owned(&mut cursor).await?;
+        let expected = ExampleEnum::Variant1 {
+            v_int: 25,
+            reg_int: 10,
+        };
+        assert_eq!(example, expected);
+
+        let mut v = vec![1, 0, 0, 0, 10, 25];
+        let mut cursor = Cursor::new(&mut v);
+        let example = ExampleEnum::decode_owned(&mut cursor).await?;
+        let expected = ExampleEnum::Variant2 {
+            reg_int: 10,
+            v_int: 25,
+        };
+        assert_eq!(example, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_encode_enum_packet() -> crate::prelude::Result<()> {
+        let mut cursor = Cursor::new(vec![0; 6]);
+        let example = ExampleEnum::Variant1 {
+            v_int: 25,
+            reg_int: 10,
+        };
+        example.encode_owned(&mut cursor).await?;
+        assert_eq!(cursor.into_inner(), vec![0, 25, 0, 0, 0, 10]);
+
+        let mut cursor = Cursor::new(vec![0; 6]);
+        let example = ExampleEnum::Variant2 {
+            reg_int: 10,
+            v_int: 25,
+        };
+        example.encode_owned(&mut cursor).await?;
+        assert_eq!(cursor.into_inner(), vec![1, 0, 0, 0, 10, 25]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_size_enum_packet() -> crate::prelude::Result<()> {
+        let example = ExampleEnum::Variant1 {
+            v_int: 25,
+            reg_int: 10,
+        };
+        assert_eq!(ExampleEnum::size_owned(&example), Size::Dynamic(6));
+
+        let example = ExampleEnum::Variant2 {
+            reg_int: 10,
+            v_int: 25,
+        };
+        assert_eq!(ExampleEnum::size_owned(&example), Size::Dynamic(6));
         Ok(())
     }
 }

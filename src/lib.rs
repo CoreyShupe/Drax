@@ -1,4 +1,5 @@
 #![feature(maybe_uninit_uninit_array)]
+#![feature(macro_metavar_expr)]
 
 //! # Drax
 //!
