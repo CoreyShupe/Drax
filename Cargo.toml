@@ -1,6 +1,5 @@
 [workspace]
 members = [
-#    "examples/status_client",
     "drax_core",
-#    "drax_derive"
+    #    "drax_derive"
 ]
