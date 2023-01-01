@@ -32,11 +32,11 @@ pub mod transport;
 
 /// Module for quickly accessing builtin delegates.
 pub mod delegates {
-    #[cfg(feature = "serde")]
-    pub use crate::transport::packet::serde_json::JsonDelegate;
-    pub use crate::transport::packet::{
-        option::{Maybe, MaybeDelegate},
-        primitive::{VarInt, VarLong},
-        vec::{ByteDrain, DelegateSlice, VecDelegate},
-    };
+    // #[cfg(feature = "serde")]
+    // pub use crate::transport::packet::serde_json::JsonDelegate;
+    // pub use crate::transport::packet::{
+    //     option::{Maybe, MaybeDelegate},
+    //     primitive::{VarInt, VarLong},
+    //     vec::{ByteDrain, DelegateSlice, VecDelegate},
+    // };
 }

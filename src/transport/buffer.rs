@@ -1,5 +1,5 @@
 use crate::err_explain;
-use crate::prelude::OwnedPacketComponent;
+use crate::prelude::PacketComponent;
 use crate::transport::buffer::var_num::{ReadVarInt, ReadVarLong, WriteVarInt, WriteVarLong};
 #[cfg(feature = "encryption")]
 use crate::transport::encryption::{DecryptRead, Decryption, EncryptedWriter, Encryption};
@@ -155,9 +155,10 @@ pub trait DraxReadExt {
     where
         Self: Sized;
 
-    fn decode_packet<'a, P: OwnedPacketComponent>(
+    fn decode_component<'a, C, P: PacketComponent<C>>(
         &'a mut self,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<P>> + 'a>>
+        context: &'a mut C,
+    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<P::ComponentType>> + 'a>>
     where
         P: Sized;
 }
@@ -190,13 +191,14 @@ where
         DecryptRead::new(self, decryption)
     }
 
-    fn decode_packet<'a, P: OwnedPacketComponent>(
+    fn decode_component<'a, C, P: PacketComponent<C>>(
         &'a mut self,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<P>> + 'a>>
+        context: &'a mut C,
+    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<P::ComponentType>> + 'a>>
     where
         P: Sized,
     {
-        P::decode_owned(self)
+        P::decode(context, self)
     }
 }
 
@@ -215,9 +217,10 @@ pub trait DraxWriteExt {
     where
         Self: Sized;
 
-    fn encode_packet<'a, P: OwnedPacketComponent>(
+    fn encode_component<'a, C, P: PacketComponent<C>>(
         &'a mut self,
-        component: &'a P,
+        context: &'a mut C,
+        component: &'a P::ComponentType,
     ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>>;
 }
 
@@ -249,11 +252,12 @@ where
         EncryptedWriter::new(self, encryption)
     }
 
-    fn encode_packet<'a, P: OwnedPacketComponent>(
+    fn encode_component<'a, C, P: PacketComponent<C>>(
         &'a mut self,
-        component: &'a P,
+        context: &'a mut C,
+        component: &'a P::ComponentType,
     ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
-        P::encode_owned(component, self)
+        P::encode(component, context, self)
     }
 }
 
