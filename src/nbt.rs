@@ -1,5 +1,4 @@
 use crate::throw_explain;
-use crate::transport::packet::PacketComponent;
 use std::collections::hash_map::Keys;
 use std::collections::HashMap;
 use std::future::Future;
@@ -213,7 +212,7 @@ async fn skip_bytes<R: AsyncRead + Unpin + ?Sized, I: Into<u64>>(
 }
 
 async fn skip_string<R: AsyncRead + Unpin + ?Sized>(read: &mut R) -> crate::prelude::Result<()> {
-    let skipped = u16::decode(read).await?;
+    let skipped = read.read_u16().await?;
     skip_bytes(read, skipped).await?;
     Ok(())
 }
@@ -221,7 +220,7 @@ async fn skip_string<R: AsyncRead + Unpin + ?Sized>(read: &mut R) -> crate::prel
 async fn read_string<R: AsyncRead + Unpin + ?Sized>(
     read: &mut R,
 ) -> crate::prelude::Result<String> {
-    let str_len = u16::decode(read).await?;
+    let str_len = read.read_u16().await?;
     if str_len == 0 {
         return Ok(String::new());
     }
