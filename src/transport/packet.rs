@@ -171,14 +171,13 @@ pub mod macros {
 
             $(#[$($tt)*])*
             ///
-            /// Packet Field Explanation
+            /// Component Variant Breakdown
             /// ---
-            /// <table>
+            /// <table style="display=flex; justify-content: start; width: 100%">
             /// <thead>
             ///     <tr>
             ///         <th>Key</th>
             ///         <th>Variant</th>
-            ///         <th>Description</th>
             ///     </tr>
             /// </thead>
             /// <tbody>
@@ -188,15 +187,35 @@ pub mod macros {
                     #[doc=$crate::enum_packet_components!(@internal @vdoc ${index(0)} $(@alt $key_matcher_case)?)]
                     ///   </td>
                     ///   <td>
-                    #[doc=stringify!($variant_name)]
-                    ///   </td>
-                    ///   <td>
-                    #[doc=$crate::expand_field!(@internal @doc $(#[$($variant_tt)*])*)]
+                    #[doc=concat!(
+                        "<a style=\"display=flex; white-space: nowrap;\" href=\"./enum.",
+                        stringify!($enum_name),
+                        ".html#variant.",
+                        stringify!($variant_name),
+                        "\"><code style=\"white-space: nowrap\">",
+                        stringify!($variant_name)
+                    )]
+                    ///   </code></a></td>
+                    /// </tr>
+                )*
+            /// </tbody>
+            /// </table>
+            pub enum $enum_name {
+                $(
                     $(#[$($variant_tt)*])*
-                    ///   </td>
                     $(
-                    ///   <td>
-                    #[doc="<table><thead><tr><th>Field</th><th>Description</th></tr></thead><tbody>"]
+                    ///
+                    /// Variant Field Breakdown
+                    /// <br />
+                    /// ---
+                    /// <table style="display=flex; justify-content: start; width: 100%">
+                    /// <thead>
+                    ///     <tr>
+                    ///         <th>Field</th>
+                    ///         <th>Description</th>
+                    ///     </tr>
+                    /// </thead>
+                    /// <tbody>
                     $(
                     #[doc=concat!(
                         "<tr><td>",
@@ -205,17 +224,10 @@ pub mod macros {
                     )]
                     #[doc=$crate::expand_field!(@internal @doc $(#[$($doc_tt)*])*)]
                     $(#[$($doc_tt)*])*
-                    #[doc="</td></tr>"]
+                    /// </td></tr>
                     )+
-                    #[doc="</tbody></table>"]
-                    /// </td>
+                    /// </tbody></table>
                     )?
-                    /// </tr>
-                )*
-            /// </tbody>
-            /// </table>
-            pub enum $enum_name {
-                $(
                     $variant_name$({
                         $(
                         $field_name: <$delegate_type as $crate::transport::packet::PacketComponent<ctx_type!(())>>::ComponentType,
@@ -425,9 +437,10 @@ pub mod macros {
                 $(#[$($tt)*])*
                 $(
                 ///
-                /// Packet Field Explanation
+                /// Component Field Breakdown
+                /// <br />
                 /// ---
-                #[doc="<table><thead><tr><th>Field</th><th>Description</th></tr></thead><tbody>"]
+                #[doc="<table style=\"display=flex; justify-content: start; width: 100%\"><thead><tr><th>Field</th><th>Description</th></tr></thead><tbody>"]
                 $(
                 #[doc=concat!(
                     "<tr><td>",
