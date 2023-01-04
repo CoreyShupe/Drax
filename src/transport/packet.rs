@@ -179,7 +179,6 @@ pub mod macros {
             ///         <th>Key</th>
             ///         <th>Variant</th>
             ///         <th>Description</th>
-            ///         <th>Variant Field Table</th>
             ///     </tr>
             /// </thead>
             /// <tbody>
