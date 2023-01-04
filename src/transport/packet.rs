@@ -411,7 +411,7 @@ pub mod macros {
                 fn decode<'a, A: $crate::prelude::AsyncRead + Unpin + ?Sized>(
                     __context: &'a mut ctx_type!(C),
                     __read: &'a mut A,
-                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = $crate::transport::packet::Result<Self>> + 'a>>
+                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = $crate::transport::Result<Self>> + 'a>>
                 where
                     Self: Sized,
                 {
@@ -431,7 +431,7 @@ pub mod macros {
                     component_ref: &'a Self,
                     __context: &'a mut ctx_type!(C),
                     __write: & 'a mut A,
-                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = $crate::transport::packet::Result<()>> + 'a>> {
+                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = $crate::transport::Result<()>> + 'a>> {
                     Box::pin(async move {
                         $($(
                         {
