@@ -2,6 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
+use crate::struct_packet_components;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -321,6 +322,12 @@ pub mod macros {
                 $crate::transport::packet::Size::Dynamic(x) => $d_counter += x,
             }
         };
+        (@internal @doc) => {
+            "N/A"
+        };
+        (@internal @doc $(#[$($doc_tt:tt)*])*) => {
+            ""
+        };
     }
 
     #[macro_export]
@@ -330,6 +337,7 @@ pub mod macros {
             pub struct $struct_name;
         };
         (@internal $(#[$($tt:tt)*])* @expand {$($ctx_ty_tt:tt)+} $(
+            $(@describe($description:expr))?
             $field_name:ident: $delegate_type:ty,
         )+ @ $struct_name:ident) => {
             macro_rules! ctx_type_struct {
@@ -350,6 +358,7 @@ pub mod macros {
             $struct_name:ident$(<$ctx_ty:ty>)? {
             $(
                 $(
+                    $(#[$($doc_tt:tt)*])*
                     $field_name:ident: $delegate_type:ty,
                 )+
             )?
@@ -360,7 +369,34 @@ pub mod macros {
                 };
             }
 
-            $crate::struct_packet_components!(@internal $(#[$($tt)*])*
+            $crate::struct_packet_components!(@internal
+                $(#[$($tt)*])*
+                $(
+                ///
+                /// Packet Field Explanation
+                /// ---
+                /// <table>
+                /// <thead>
+                ///     <tr>
+                ///         <th>Field</th>
+                ///         <th>Description</th>
+                ///     </tr>
+                /// </thead>
+                /// <tbody>
+                    $(
+                      /// <tr>
+                      ///   <td>
+                      #[doc=stringify!($field_name)]
+                      ///   </td>
+                      ///   <td>
+                      #[doc=$crate::expand_field!(@internal @doc $(#[$($doc_tt)*])*)]
+                      $(#[$($doc_tt)*])*
+                      ///   </td>
+                      /// </tr>
+                    )+
+                /// </tbody>
+                /// </table>
+                )?
                 $(
                     @expand {ctx_type!(())} $(
                         $field_name: $delegate_type,
@@ -430,6 +466,8 @@ pub mod macros {
         )*};
     }
 }
+
+use crate::transport::packet::primitive::{VarInt, VarLong};
 
 #[cfg(feature = "tcp-shield")]
 mod tcp_shield {
