@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 
 use tokio::io::{AsyncRead, AsyncWrite};
 
@@ -50,6 +51,56 @@ pub trait PacketComponent<C> {
     ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>>;
 
     fn size(input: &Self::ComponentType, context: &mut C) -> crate::prelude::Result<Size>;
+}
+
+macro_rules! impl_deref_component {
+    ($c_ty:ty, $t_ty:ty) => {
+        type ComponentType = <$t_ty as $crate::prelude::PacketComponent<$c_ty>>::ComponentType;
+
+        fn decode<'a, A: $crate::prelude::AsyncRead + Unpin + ?Sized>(
+            context: &'a mut $c_ty,
+            read: &'a mut A,
+        ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>> {
+            <$t_ty as $crate::prelude::PacketComponent<$c_ty>>::decode(context, read)
+        }
+
+        fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+            component_ref: &'a Self::ComponentType,
+            context: &'a mut $c_ty,
+            write: &'a mut A,
+        ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+            <$t_ty as $crate::prelude::PacketComponent<$c_ty>>::encode(
+                component_ref,
+                context,
+                write,
+            )
+        }
+
+        fn size(input: &Self::ComponentType, context: &mut $c_ty) -> crate::prelude::Result<Size> {
+            <$t_ty as $crate::prelude::PacketComponent<$c_ty>>::size(input, context)
+        }
+    };
+}
+
+impl<T, C> PacketComponent<C> for Box<T>
+where
+    T: PacketComponent<C>,
+{
+    impl_deref_component!(C, T);
+}
+
+impl<T, C> PacketComponent<C> for Arc<T>
+where
+    T: PacketComponent<C>,
+{
+    impl_deref_component!(C, T);
+}
+
+impl<T, C> PacketComponent<C> for &T
+where
+    T: PacketComponent<C>,
+{
+    impl_deref_component!(C, T);
 }
 
 #[cfg(feature = "nbt")]
