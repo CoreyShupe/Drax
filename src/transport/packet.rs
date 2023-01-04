@@ -443,7 +443,7 @@ pub mod macros {
                     })
                 }
 
-                fn size(component_ref: &Self, __context: &mut ctx_type!(C)) -> $crate::prelude::Result<Size> {
+                fn size(component_ref: &Self, __context: &mut ctx_type!(C)) -> $crate::prelude::Result<$crate::prelude::Size> {
                     let constant_counter = 0;
                     let dynamic_counter = 0;
 
