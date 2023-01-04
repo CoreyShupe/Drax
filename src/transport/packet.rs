@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use crate::struct_packet_components;
+use crate::{enum_packet_components, struct_packet_components};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -146,10 +146,12 @@ pub mod macros {
                 $(@ser_delegate $static_product_delegate_type:ty,)?
                 $(@match $key_matcher:expr,)?
             $(
+                $(#[$($variant_tt:tt)*])*
                 $($key_matcher_case:literal =>)? $variant_name:ident {
                     $(
                         $(
-                        $field_name:ident: $delegate_type:ty,
+                            $(#[$($doc_tt:tt)*])*
+                            $field_name:ident: $delegate_type:ty,
                         )+
                     )?
                 }
@@ -162,6 +164,51 @@ pub mod macros {
             }
 
             $(#[$($tt)*])*
+            ///
+            /// Packet Field Explanation
+            /// ---
+            /// <table>
+            /// <thead>
+            ///     <tr>
+            ///         <th>Key</th>
+            ///         <th>Variant</th>
+            ///         <th>Description</th>
+            ///         <th>Variant Field Table</th>
+            ///     </tr>
+            /// </thead>
+            /// <tbody>
+                $(
+                    /// <tr>
+                    ///   <td>
+                    #[doc=concat!($crate::enum_packet_components!(@internal @case ${index(0)} $(@alt $key_matcher_case)?))]
+                    ///   </td>
+                    ///   <td>
+                    #[doc=stringify!($variant_name)]
+                    ///   </td>
+                    ///   <td>
+                    #[doc=$crate::expand_field!(@internal @doc $(#[$($variant_tt)*])*)]
+                    $(#[$($variant_tt)*])*
+                    ///   </td>
+                    $(
+                    ///   <td>
+                    #[doc="<table><thead><tr><th>Field</th><th>Description</th></tr></thead><tbody>"]
+                    $(
+                    #[doc=concat!(
+                        "<tr><td>",
+                        stringify!($field_name),
+                        "</td><td>"
+                    )]
+                    #[doc=$crate::expand_field!(@internal @doc $(#[$($doc_tt)*])*)]
+                    $(#[$($doc_tt)*])*
+                    #[doc="</td></tr>"]
+                    )+
+                    #[doc="</tbody></table>"]
+                    /// </td>
+                    )?
+                    /// </tr>
+                )*
+            /// </tbody>
+            /// </table>
             pub enum $enum_name {
                 $(
                     $variant_name$({
@@ -375,27 +422,18 @@ pub mod macros {
                 ///
                 /// Packet Field Explanation
                 /// ---
-                /// <table>
-                /// <thead>
-                ///     <tr>
-                ///         <th>Field</th>
-                ///         <th>Description</th>
-                ///     </tr>
-                /// </thead>
-                /// <tbody>
-                    $(
-                      /// <tr>
-                      ///   <td>
-                      #[doc=stringify!($field_name)]
-                      ///   </td>
-                      ///   <td>
-                      #[doc=$crate::expand_field!(@internal @doc $(#[$($doc_tt)*])*)]
-                      $(#[$($doc_tt)*])*
-                      ///   </td>
-                      /// </tr>
-                    )+
-                /// </tbody>
-                /// </table>
+                #[doc="<table><thead><tr><th>Field</th><th>Description</th></tr></thead><tbody>"]
+                $(
+                #[doc=concat!(
+                    "<tr><td>",
+                    stringify!($field_name),
+                    "</td><td>"
+                )]
+                #[doc=$crate::expand_field!(@internal @doc $(#[$($doc_tt)*])*)]
+                $(#[$($doc_tt)*])*
+                #[doc="</td></tr>"]
+                )+
+                #[doc="</tbody></table>"]
                 )?
                 $(
                     @expand {ctx_type!(())} $(
