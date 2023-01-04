@@ -178,7 +178,7 @@ pub mod macros {
                 fn decode<'a, A: $crate::prelude::AsyncRead + Unpin + ?Sized>(
                     __context: &'a mut ctx_type!(C),
                     __read: &'a mut A,
-                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = crate::prelude::Result<Self>> + 'a>>
+                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = crate::transport::Result<Self>> + 'a>>
                 where
                     Self: Sized
                 {
@@ -205,7 +205,7 @@ pub mod macros {
                     component_ref: &'a Self,
                     __context: &'a mut ctx_type!(C),
                     __write: &'a mut A,
-                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = crate::prelude::Result<()>> + 'a>>
+                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = crate::transport::Result<()>> + 'a>>
                 {
                     Box::pin(async move {
                         macro_rules! expand_key_types {
@@ -291,12 +291,12 @@ pub mod macros {
     #[macro_export]
     macro_rules! expand_field {
         (@internal @impl_bind $struct_name:ident, $field_name:ident { $($impl_tokens:tt)* }) => {
-            impl<$field_name> $crate::prelude::PacketComponent<$field_name> for $struct_name {
+            impl<$field_name> $crate::transport::packet::PacketComponent<$field_name> for $struct_name {
                 $($impl_tokens)*
             }
         };
         (@internal @impl_bind $struct_name:ident, $__:ident @alt $ctx_ty:ty { $($impl_tokens:tt)* }) => {
-            impl $crate::prelude::PacketComponent<$ctx_ty> for $struct_name {
+            impl $crate::transport::packet::PacketComponent<$ctx_ty> for $struct_name {
                 $($impl_tokens)*
             }
         };
@@ -307,13 +307,13 @@ pub mod macros {
             $ctx_ty
         };
         (@internal @ser_bind $context:ident: $ctx_ty:ty, $w_ident:ident, $field_name:ident, $delegate_type:ty) => {
-            <$delegate_type as $crate::prelude::PacketComponent<$ctx_ty>>::encode($field_name, $context, $w_ident).await?
+            <$delegate_type as $crate::transport::packet::PacketComponent<$ctx_ty>>::encode($field_name, $context, $w_ident).await?
         };
         (@internal @de_bind $context:ident: $ctx_ty:ty, $r_ident:ident, $field_name:ident, $delegate_type:ty) => {
-            let $field_name = <$delegate_type as $crate::prelude::PacketComponent<$ctx_ty>>::decode($context, $r_ident).await?;
+            let $field_name = <$delegate_type as $crate::transport::packet::PacketComponent<$ctx_ty>>::decode($context, $r_ident).await?;
         };
         (@internal @size_bind $context:ident: $ctx_ty:ty, $c_counter:ident, $d_counter:ident, $field_name:ident, $delegate_type:ty) => {
-            match <$delegate_type as $crate::prelude::PacketComponent<$ctx_ty>>::size($field_name, $context)?
+            match <$delegate_type as $crate::transport::packet::PacketComponent<$ctx_ty>>::size($field_name, $context)?
             {
                 $crate::transport::packet::Size::Constant(x) => {
                     $c_counter += x;
@@ -349,7 +349,7 @@ pub mod macros {
             $(#[$($tt)*])*
             pub struct $struct_name {
                 $(
-                pub $field_name: <$delegate_type as $crate::prelude::PacketComponent<ctx_type_struct!()>>::ComponentType,
+                pub $field_name: <$delegate_type as $crate::transport::packet::PacketComponent<ctx_type_struct!()>>::ComponentType,
                 )+
             }
         };
@@ -411,7 +411,7 @@ pub mod macros {
                 fn decode<'a, A: $crate::prelude::AsyncRead + Unpin + ?Sized>(
                     __context: &'a mut ctx_type!(C),
                     __read: &'a mut A,
-                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = $crate::prelude::Result<Self>> + 'a>>
+                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = $crate::transport::packet::Result<Self>> + 'a>>
                 where
                     Self: Sized,
                 {
@@ -431,7 +431,7 @@ pub mod macros {
                     component_ref: &'a Self,
                     __context: &'a mut ctx_type!(C),
                     __write: & 'a mut A,
-                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = $crate::prelude::Result<()>> + 'a>> {
+                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = $crate::transport::packet::Result<()>> + 'a>> {
                     Box::pin(async move {
                         $($(
                         {
@@ -443,7 +443,7 @@ pub mod macros {
                     })
                 }
 
-                fn size(component_ref: &Self, __context: &mut ctx_type!(C)) -> $crate::prelude::Result<$crate::prelude::Size> {
+                fn size(component_ref: &Self, __context: &mut ctx_type!(C)) -> $crate::transport::Result<$crate::transport::packet::Size> {
                     let constant_counter = 0;
                     let dynamic_counter = 0;
 
