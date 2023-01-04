@@ -178,7 +178,7 @@ pub mod macros {
                 fn decode<'a, A: $crate::prelude::AsyncRead + Unpin + ?Sized>(
                     __context: &'a mut ctx_type!(C),
                     __read: &'a mut A,
-                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = crate::transport::Result<Self>> + 'a>>
+                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = $crate::transport::Result<Self>> + 'a>>
                 where
                     Self: Sized
                 {
@@ -205,7 +205,7 @@ pub mod macros {
                     component_ref: &'a Self,
                     __context: &'a mut ctx_type!(C),
                     __write: &'a mut A,
-                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = crate::transport::Result<()>> + 'a>>
+                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = $crate::transport::Result<()>> + 'a>>
                 {
                     Box::pin(async move {
                         macro_rules! expand_key_types {
@@ -466,8 +466,6 @@ pub mod macros {
         )*};
     }
 }
-
-use crate::transport::packet::primitive::{VarInt, VarLong};
 
 #[cfg(feature = "tcp-shield")]
 mod tcp_shield {
