@@ -130,10 +130,10 @@ pub mod macros {
             $value
         };
         (@internal @vdoc $value:literal) => {
-            concat!($value)
+            stringify!($value)
         };
         (@internal @vdoc $__:literal @alt $value:literal) => {
-            concat!($value)
+            stringify!($value)
         };
         ($context:ident: $ctx_ty:ty, $w_ident:ident, $field_name:ident @ser : $ty:ty) => {
             $crate::expand_field!(@internal @ser_bind $context: $ctx_ty, $w_ident, $field_name, $ty)
