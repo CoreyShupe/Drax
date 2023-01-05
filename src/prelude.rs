@@ -5,3 +5,4 @@ pub use crate::transport::{
     Result,
 };
 pub use tokio::io::{AsyncRead, AsyncWrite};
+pub use uuid::Uuid;
