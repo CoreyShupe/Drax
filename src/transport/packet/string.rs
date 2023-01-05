@@ -59,7 +59,7 @@ impl<C, const N: usize> PacketComponent<C> for LimitedString<N> {
     type ComponentType = String;
 
     fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
-        context: &'a mut C,
+        _: &'a mut C,
         read: &'a mut A,
     ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>> {
         Box::pin(async move {
@@ -83,10 +83,12 @@ impl<C, const N: usize> PacketComponent<C> for LimitedString<N> {
         write: &'a mut A,
     ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
         if component_ref.len() > N * 4 {
-            throw_explain!(format!(
-                "While decoding; string exceeded length bound {}",
-                N * 4
-            ))
+            return Box::pin(async move {
+                throw_explain!(format!(
+                    "While decoding; string exceeded length bound {}",
+                    N * 4
+                ))
+            });
         }
 
         String::encode(component_ref, context, write)
