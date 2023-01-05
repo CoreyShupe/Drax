@@ -5,6 +5,7 @@ use std::pin::Pin;
 use crate::transport::buffer::var_num::{size_var_int, size_var_long};
 use crate::transport::buffer::{DraxReadExt, DraxWriteExt};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use uuid::Uuid;
 
 use super::{PacketComponent, Size};
 
@@ -93,5 +94,36 @@ impl<C> PacketComponent<C> for VarLong {
 
     fn size(input: &Self::ComponentType, _: &mut C) -> crate::prelude::Result<Size> {
         Ok(Size::Dynamic(size_var_long(*input)))
+    }
+}
+
+impl<C> PacketComponent<C> for Uuid {
+    type ComponentType = Uuid;
+
+    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+        _: &'a mut C,
+        read: &'a mut A,
+    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>> {
+        Box::pin(async move {
+            let mut buf = [0; 16];
+            read.read_exact(&mut buf).await?;
+            let uuid = Uuid::from_slice(&buf)?;
+            Ok(uuid)
+        })
+    }
+
+    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+        component_ref: &'a Self::ComponentType,
+        _: &'a mut C,
+        write: &'a mut A,
+    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+        Box::pin(async move {
+            write.write_all(component_ref.as_bytes()).await?;
+            Ok(())
+        })
+    }
+
+    fn size(_: &Self::ComponentType, _: &mut C) -> crate::prelude::Result<Size> {
+        Ok(Size::Constant(size_of::<u64>() * 2))
     }
 }

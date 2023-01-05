@@ -69,6 +69,8 @@ pub mod error {
         /// Cesu 8 Decoding Error during NBT parsing.
         #[cfg(feature = "nbt")]
         Cesu8DecodingError(cesu8::Cesu8DecodingError),
+        /// The error is caused by an unknown uuid error.
+        UuidError(uuid::Error),
     }
 
     impl std::error::Error for TransportError {}
@@ -87,6 +89,7 @@ pub mod error {
                 ErrorType::SerdeJsonError(err) => write!(f, "SerdeJsonError {}", err),
                 #[cfg(feature = "nbt")]
                 ErrorType::Cesu8DecodingError(err) => write!(f, "Cesu8DecodingError {}", err),
+                ErrorType::UuidError(err) => write!(f, "UuidError {}", err),
             }
         }
     }
@@ -167,6 +170,12 @@ pub mod error {
     impl From<cesu8::Cesu8DecodingError> for ErrorType {
         fn from(value: cesu8::Cesu8DecodingError) -> Self {
             ErrorType::Cesu8DecodingError(value)
+        }
+    }
+
+    impl From<uuid::Error> for ErrorType {
+        fn from(value: uuid::Error) -> Self {
+            Self::UuidError(value)
         }
     }
 
