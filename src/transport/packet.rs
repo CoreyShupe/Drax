@@ -585,12 +585,12 @@ mod test {
         #[derive(Debug, Eq, PartialEq)]
         Example<String> {
             v_int: VarInt,
-            uu: i32,
+            uu: i32
         }
         #[derive(Debug, Eq, PartialEq)]
         _Example2 {
             v_int: VarInt,
-            uu: i32,
+            uu: i32
         }
     }
 
@@ -600,11 +600,11 @@ mod test {
             key: VarInt,
             Variant1 {
                 v_int: VarInt,
-                reg_int: i32,
+                reg_int: i32
             },
             Variant2 {
                 reg_int: i32,
-                v_int: VarInt,
+                v_int: VarInt
             }
         }
     }

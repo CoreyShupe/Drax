@@ -47,6 +47,29 @@ macro_rules! define_primitive_bind {
 
 define_primitive_bind!(u8, u16, u32, u64, i8, i16, i32, i64, f32, f64);
 
+impl<C> PacketComponent<C> for () {
+    type ComponentType = ();
+
+    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+        _: &'a mut C,
+        _: &'a mut A,
+    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>> {
+        Box::pin(async move { Ok(()) })
+    }
+
+    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+        _: &'a Self::ComponentType,
+        _: &'a mut C,
+        _: &'a mut A,
+    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+        Box::pin(async move { Ok(()) })
+    }
+
+    fn size(_: &Self::ComponentType, _: &mut C) -> crate::prelude::Result<Size> {
+        Ok(Size::Constant(0))
+    }
+}
+
 impl<C> PacketComponent<C> for bool {
     type ComponentType = bool;
 
