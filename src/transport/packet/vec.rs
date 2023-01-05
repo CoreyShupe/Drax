@@ -1,7 +1,10 @@
+use std::fmt::format;
 use std::future::Future;
+use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
 
+use crate::throw_explain;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::transport::buffer::var_num::size_var_int;
@@ -213,5 +216,57 @@ where
             }
         }
         Ok(Size::Dynamic(dynamic_counter))
+    }
+}
+
+pub struct LimitedVec<T, const N: usize>(PhantomData<T>);
+
+impl<T, C, const N: usize> PacketComponent<C> for LimitedVec<T, N>
+where
+    T: PacketComponent<C>,
+{
+    type ComponentType = Vec<T::ComponentType>;
+
+    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+        context: &'a mut C,
+        read: &'a mut A,
+    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>> {
+        Box::pin(async move {
+            let vec_size = read.read_var_int().await? as usize;
+            if vec_size > N {
+                throw_explain!(format!(
+                    "Tried to encode vec of length {} but was bound to length {}",
+                    vec_size, N
+                ));
+            }
+
+            let mut vec = Vec::with_capacity(vec_size);
+            for _ in 0..vec_size {
+                vec.push(T::decode(context, read).await?);
+            }
+            Ok(vec)
+        })
+    }
+
+    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+        component_ref: &'a Self::ComponentType,
+        context: &'a mut C,
+        write: &'a mut A,
+    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+        if component_ref.len() > N {
+            return Box::pin(async move {
+                throw_explain!(format!(
+                    "Tried to encode vec of length {} but was bound to length {}.",
+                    component_ref.len(),
+                    N
+                ))
+            });
+        }
+
+        Vec::<T>::encode(component_ref, context, write)
+    }
+
+    fn size(input: &Self::ComponentType, context: &mut C) -> crate::prelude::Result<Size> {
+        Vec::<T>::size(input, context)
     }
 }

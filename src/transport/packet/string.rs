@@ -52,3 +52,47 @@ impl<C> PacketComponent<C> for String {
         ))
     }
 }
+
+pub struct LimitedString<const N: usize>;
+
+impl<C, const N: usize> PacketComponent<C> for LimitedString<N> {
+    type ComponentType = String;
+
+    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+        context: &'a mut C,
+        read: &'a mut A,
+    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>> {
+        Box::pin(async move {
+            let string_size = read.read_var_int().await?;
+            if string_size > N as i32 * 4 {
+                throw_explain!(format!(
+                    "While encoding; string exceeded length bound {}",
+                    N * 4
+                ))
+            }
+
+            let mut buf = vec![0; string_size as usize];
+            read.read_exact(&mut buf).await?;
+            Ok(String::from_utf8(buf)?)
+        })
+    }
+
+    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+        component_ref: &'a Self::ComponentType,
+        context: &'a mut C,
+        write: &'a mut A,
+    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+        if component_ref.len() > N * 4 {
+            throw_explain!(format!(
+                "While decoding; string exceeded length bound {}",
+                N * 4
+            ))
+        }
+
+        String::encode(component_ref, context, write)
+    }
+
+    fn size(input: &Self::ComponentType, context: &mut C) -> crate::prelude::Result<Size> {
+        String::size(input, context)
+    }
+}
