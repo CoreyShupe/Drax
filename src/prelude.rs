@@ -4,5 +4,5 @@ pub use crate::transport::{
     packet::{PacketComponent, Size},
     Result,
 };
-pub use tokio::io::{AsyncRead, AsyncWrite};
+pub use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 pub use uuid::Uuid;

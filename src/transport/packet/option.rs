@@ -3,6 +3,8 @@ use std::future::Future;
 use std::pin::Pin;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
+impl<C, T> PacketComponent<C> for Option<T> {}
+
 pub struct Maybe<T> {
     _phantom_t: T,
 }
