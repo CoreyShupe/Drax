@@ -1,4 +1,3 @@
-use std::fmt::format;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;

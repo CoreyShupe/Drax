@@ -2,7 +2,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use crate::{enum_packet_components, struct_packet_components};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -157,8 +156,8 @@ pub mod macros {
                     $(
                         $(
                             $(#[$($doc_tt:tt)*])*
-                            $field_name:ident: $delegate_type:ty,
-                        )+
+                            $field_name:ident: $delegate_type:ty
+                        ),+
                     )?
                 },
             )*
@@ -423,8 +422,8 @@ pub mod macros {
             $(
                 $(
                     $(#[$($doc_tt:tt)*])*
-                    $field_name:ident: $delegate_type:ty,
-                )+
+                    $field_name:ident: $delegate_type:ty
+                ),+
             )?
         })*) => {$(
             macro_rules! ctx_type {
