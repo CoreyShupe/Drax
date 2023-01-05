@@ -160,8 +160,8 @@ pub mod macros {
                             $field_name:ident: $delegate_type:ty,
                         )+
                     )?
-                }
-            ),*
+                },
+            )*
         })*) => {$(
             macro_rules! ctx_type {
                 ($$alt_ty:ty) => {
