@@ -54,14 +54,17 @@ pub trait PacketComponent<C> {
 }
 
 macro_rules! impl_deref_component {
-    ($c_ty:ty, $t_ty:ty) => {
-        type ComponentType = <$t_ty as $crate::prelude::PacketComponent<$c_ty>>::ComponentType;
+    ($impl_ty:ty, $c_ty:ty, $t_ty:ty) => {
+        type ComponentType = $impl_ty;
 
         fn decode<'a, A: $crate::prelude::AsyncRead + Unpin + ?Sized>(
             context: &'a mut $c_ty,
             read: &'a mut A,
         ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>> {
-            <$t_ty as $crate::prelude::PacketComponent<$c_ty>>::decode(context, read)
+            Box::pin(async move {
+                let component = T::decode(context, read).await?;
+                Ok(<$impl_ty>::new(component))
+            })
         }
 
         fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
@@ -70,14 +73,14 @@ macro_rules! impl_deref_component {
             write: &'a mut A,
         ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
             <$t_ty as $crate::prelude::PacketComponent<$c_ty>>::encode(
-                component_ref,
+                component_ref.as_ref(),
                 context,
                 write,
             )
         }
 
         fn size(input: &Self::ComponentType, context: &mut $c_ty) -> crate::prelude::Result<Size> {
-            <$t_ty as $crate::prelude::PacketComponent<$c_ty>>::size(input, context)
+            <$t_ty as $crate::prelude::PacketComponent<$c_ty>>::size(input.as_ref(), context)
         }
     };
 }
@@ -86,21 +89,14 @@ impl<T, C> PacketComponent<C> for Box<T>
 where
     T: PacketComponent<C>,
 {
-    impl_deref_component!(C, T);
+    impl_deref_component!(Box<T::ComponentType>, C, T);
 }
 
 impl<T, C> PacketComponent<C> for Arc<T>
 where
     T: PacketComponent<C>,
 {
-    impl_deref_component!(C, T);
-}
-
-impl<T, C> PacketComponent<C> for &T
-where
-    T: PacketComponent<C>,
-{
-    impl_deref_component!(C, T);
+    impl_deref_component!(Arc<T::ComponentType>, C, T);
 }
 
 #[cfg(feature = "nbt")]
