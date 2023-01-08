@@ -16,6 +16,8 @@
 //! amount of allocations and copying required. While the bytes are drained from the source they're
 //! used to build out the correlating types. <br />
 
+use std::pin::Pin;
+
 /// NBT is a tree data structure used and defined in Minecraft's protocol. This is extended to this
 /// crate to allow for easy low-level serialization and deserialization of NBT data. This entire
 /// module can be omitted by disabling the `nbt` feature.
@@ -30,6 +32,8 @@ pub mod prelude;
 /// available during serialization and deserialization to account for common types.
 pub mod transport;
 
+pub type PinnedLivelyResult<'a, T> =
+    Pin<Box<dyn std::future::Future<Output = transport::Result<T>> + 'a>>;
+
 /// Module for quickly accessing builtin delegates.
-pub mod delegates {
-}
+pub mod delegates {}
