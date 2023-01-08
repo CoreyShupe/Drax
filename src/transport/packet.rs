@@ -152,7 +152,7 @@ pub mod macros {
                     $(
                         $(
                             $(#[$($doc_tt:tt)*])*
-                            $field_name:ident: $delegate_type:ty
+                            $field_name:ident: $(#[$($more_tt:tt)*])* $delegate_type:ty
                         ),+
                     )?
                 }
@@ -225,6 +225,7 @@ pub mod macros {
                     )?
                     $variant_name$({
                         $(
+                        $(#[$($more_tt)*])*
                         $field_name: <$delegate_type as $crate::transport::packet::PacketComponent<ctx_type!(())>>::ComponentType,
                         )+
                     })?,
@@ -397,7 +398,7 @@ pub mod macros {
         };
         (@internal $(#[$($tt:tt)*])* @expand {$($ctx_ty_tt:tt)+} $(
             $(@describe($description:expr))?
-            $field_name:ident: $delegate_type:ty,
+            $field_name:ident: $(#[$($more_tt:tt)*])* $delegate_type:ty,
         )+ @ $struct_name:ident) => {
             macro_rules! ctx_type_struct {
                 () => {
@@ -408,6 +409,7 @@ pub mod macros {
             $(#[$($tt)*])*
             pub struct $struct_name {
                 $(
+                $(#[$($more_tt)*])*
                 pub $field_name: <$delegate_type as $crate::transport::packet::PacketComponent<ctx_type_struct!()>>::ComponentType,
                 )+
             }
@@ -418,7 +420,7 @@ pub mod macros {
             $(
                 $(
                     $(#[$($doc_tt:tt)*])*
-                    $field_name:ident: $delegate_type:ty
+                    $field_name:ident: $(#[$($more_tt:tt)*])* $delegate_type:ty
                 ),+
             )?
         })*) => {$(
@@ -450,7 +452,7 @@ pub mod macros {
                 )?
                 $(
                     @expand {ctx_type!(())} $(
-                        $field_name: $delegate_type,
+                        $field_name: $(#[$($more_tt)*])* $delegate_type,
                     )+
                 )?
                 @ $struct_name
