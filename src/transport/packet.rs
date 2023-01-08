@@ -196,6 +196,7 @@ pub mod macros {
                 )*
             /// </tbody>
             /// </table>
+            #[derive(Debug)]
             pub enum $enum_name {
                 $(
                     $(#[$($variant_tt)*])*
@@ -395,6 +396,7 @@ pub mod macros {
     macro_rules! struct_packet_components {
         (@internal $(#[$($tt:tt)*])* @ $struct_name:ident) => {
             $(#[$($tt)*])*
+            #[derive(Debug)]
             pub struct $struct_name;
         };
         (@internal $(#[$($tt:tt)*])* @expand {$($ctx_ty_tt:tt)+} $(
@@ -408,6 +410,7 @@ pub mod macros {
             }
 
             $(#[$($tt)*])*
+            #[derive(Debug)]
             pub struct $struct_name {
                 $(
                 $(#[$($more_tt)*])*
