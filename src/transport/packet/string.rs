@@ -24,8 +24,7 @@ impl<C> PacketComponent<C> for String {
             let len = read.read_var_int().await?;
             if len > STRING_DEFAULT_CAP {
                 throw_explain!(format!(
-                    "String exceeded length bound {}",
-                    STRING_DEFAULT_CAP
+                    "String exceeded length bound {STRING_DEFAULT_CAP}"
                 ))
             }
             let mut buf = vec![0; len as usize];

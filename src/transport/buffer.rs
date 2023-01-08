@@ -103,7 +103,7 @@ impl<'a, A> ReadLimiter<'a, A> {
     /// assert_err!(limiter.assert_length());
     /// ```
     pub fn assert_length(&self) -> crate::transport::Result<()> {
-        if self.current == self.limit as usize {
+        if self.current == self.limit {
             Ok(())
         } else {
             Err(err_explain!(
@@ -123,7 +123,7 @@ where
         buf: &mut ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
         let filled_current = buf.filled().len();
-        if self.current + buf.remaining() > self.limit as usize {
+        if self.current + buf.remaining() > self.limit {
             return Poll::Ready(Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Read limit exceeded",

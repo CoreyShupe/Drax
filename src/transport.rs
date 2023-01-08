@@ -81,15 +81,15 @@ pub mod error {
             match &self.error_type {
                 ErrorType::Generic => write!(f, "Generic Error"),
                 ErrorType::EOF => write!(f, "EOF"),
-                ErrorType::IoError(err) => write!(f, "IoError {}", err),
-                ErrorType::TryFromIntError(err) => write!(f, "TryFromIntError {}", err),
-                ErrorType::FromUtf8Error(err) => write!(f, "FromUtf8Error {}", err),
-                ErrorType::Utf8Error(err) => write!(f, "Utf8Error {}", err),
+                ErrorType::IoError(err) => write!(f, "IoError {err}"),
+                ErrorType::TryFromIntError(err) => write!(f, "TryFromIntError {err}"),
+                ErrorType::FromUtf8Error(err) => write!(f, "FromUtf8Error {err}"),
+                ErrorType::Utf8Error(err) => write!(f, "Utf8Error {err}"),
                 #[cfg(feature = "serde")]
-                ErrorType::SerdeJsonError(err) => write!(f, "SerdeJsonError {}", err),
+                ErrorType::SerdeJsonError(err) => write!(f, "SerdeJsonError {err}"),
                 #[cfg(feature = "nbt")]
                 ErrorType::Cesu8DecodingError(err) => write!(f, "Cesu8DecodingError {}", err),
-                ErrorType::UuidError(err) => write!(f, "UuidError {}", err),
+                ErrorType::UuidError(err) => write!(f, "UuidError {err}"),
             }
         }
     }
@@ -128,7 +128,7 @@ pub mod error {
             match self {
                 TransportErrorContext::Unknown => write!(f, "Unknown"),
                 TransportErrorContext::Yeeted => write!(f, "Yeeted"),
-                TransportErrorContext::Explainable(reason) => write!(f, "`{}`", reason),
+                TransportErrorContext::Explainable(reason) => write!(f, "`{reason}`"),
             }
         }
     }

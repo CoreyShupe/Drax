@@ -35,7 +35,7 @@ impl<C> PacketComponent<C> for ByteDrain {
         write: &'a mut A,
     ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
         Box::pin(async move {
-            write.write_all(&component_ref).await?;
+            write.write_all(component_ref).await?;
             Ok(())
         })
     }
@@ -234,8 +234,7 @@ where
             let vec_size = read.read_var_int().await? as usize;
             if vec_size > N {
                 throw_explain!(format!(
-                    "Tried to encode vec of length {} but was bound to length {}",
-                    vec_size, N
+                    "Tried to encode vec of length {vec_size} but was bound to length {N}"
                 ));
             }
 
