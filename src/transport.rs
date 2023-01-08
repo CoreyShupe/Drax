@@ -17,9 +17,9 @@ pub mod error {
     #[derive(Debug)]
     pub struct TransportError {
         /// The context around the error.
-        context: TransportErrorContext,
+        pub context: TransportErrorContext,
         /// The cause of the error.
-        error_type: ErrorType,
+        pub error_type: ErrorType,
     }
 
     impl TransportError {

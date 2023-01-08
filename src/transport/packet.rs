@@ -2,6 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
+use crate::PinnedLivelyResult;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -41,14 +42,14 @@ pub trait PacketComponent<C> {
     fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
         context: &'a mut C,
         read: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>>;
+    ) -> PinnedLivelyResult<'a, Self::ComponentType>;
 
     /// Encodes the packet component to the given writer.
     fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
         component_ref: &'a Self::ComponentType,
         context: &'a mut C,
         write: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>>;
+    ) -> PinnedLivelyResult<'a, ()>;
 
     fn size(input: &Self::ComponentType, context: &mut C) -> crate::prelude::Result<Size>;
 }
