@@ -397,14 +397,10 @@ define_tags! {
     }
 }
 
-#[derive(Debug)]
-pub enum EnsuredCompoundTag<const LIMIT: u64 = 0> {
-    Tagged(Tag),
-    NoTag,
-}
+pub struct EnsuredCompoundTag<const LIMIT: u64 = 0>;
 
 impl<const LIMIT: u64, C> PacketComponent<C> for EnsuredCompoundTag<LIMIT> {
-    type ComponentType = EnsuredCompoundTag<LIMIT>;
+    type ComponentType = Option<Tag>;
 
     fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
         _: &'a mut C,
@@ -413,7 +409,7 @@ impl<const LIMIT: u64, C> PacketComponent<C> for EnsuredCompoundTag<LIMIT> {
         Box::pin(async move {
             let b = read.read_u8().await?;
             if b == 0 {
-                return Ok(EnsuredCompoundTag::NoTag);
+                return Ok(None);
             }
             if b != 10 {
                 throw_explain!(format!(
@@ -427,7 +423,7 @@ impl<const LIMIT: u64, C> PacketComponent<C> for EnsuredCompoundTag<LIMIT> {
             };
             let _ = read_string(read, &mut accounter).await?;
             let tag = load_tag(read, b, 0, &mut accounter).await?;
-            Ok(EnsuredCompoundTag::Tagged(tag))
+            Ok(Some(tag))
         })
     }
 
@@ -438,13 +434,13 @@ impl<const LIMIT: u64, C> PacketComponent<C> for EnsuredCompoundTag<LIMIT> {
     ) -> PinnedLivelyResult<'a, ()> {
         Box::pin(async move {
             match component_ref {
-                EnsuredCompoundTag::Tagged(tag) => {
+                Some(tag) => {
                     write.write_u8(10).await?;
                     write_string(write, &format!("")).await?;
                     write_tag(write, tag).await?;
                     Ok(())
                 }
-                EnsuredCompoundTag::NoTag => {
+                None => {
                     write.write_u8(0).await?;
                     Ok(())
                 }
@@ -454,11 +450,11 @@ impl<const LIMIT: u64, C> PacketComponent<C> for EnsuredCompoundTag<LIMIT> {
 
     fn size(input: &Self::ComponentType, _: &mut C) -> crate::prelude::Result<Size> {
         match input {
-            EnsuredCompoundTag::Tagged(tag) => {
+            Some(tag) => {
                 let dynamic_size = Size::Dynamic(3); // short 0 for str + byte tag
                 Ok(dynamic_size + size_tag(tag)?)
             }
-            EnsuredCompoundTag::NoTag => Ok(Size::Constant(1)),
+            None => Ok(Size::Constant(1)),
         }
     }
 }
