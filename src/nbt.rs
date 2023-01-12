@@ -124,8 +124,9 @@ async fn write_string<W: AsyncWrite + Unpin + ?Sized>(
     write: &mut W,
     reference: &String,
 ) -> crate::prelude::Result<()> {
-    write.write_u16(reference.len() as u16).await?;
-    write.write_all(&cesu8::to_java_cesu8(reference)).await?;
+    let cesu_8 = &cesu8::to_java_cesu8(reference);
+    write.write_u16(cesu_8.len() as u16).await?;
+    write.write_all(&cesu_8).await?;
     Ok(())
 }
 
