@@ -277,14 +277,6 @@ define_tags! {
             })
         },
         fn write(writer, reference) {
-            let mut cursor = Cursor::new(vec![]);
-            cursor.write_u8(reference.0).await?;
-            cursor.write_i32(reference.1.len() as i32).await?;
-            for tag in &reference.1 {
-                write_tag(&mut cursor, tag).await?;
-            }
-            println!("Encoded {:?} as {:?}", reference, cursor.into_inner());
-
             writer.write_u8(reference.0).await?;
             writer.write_i32(reference.1.len() as i32).await?;
             for tag in &reference.1 {
@@ -322,19 +314,6 @@ define_tags! {
             Ok(size + 1)
         },
         fn write(writer, reference) {
-            let mut cursor = Cursor::new(vec![]);
-            if reference.is_empty() {
-                cursor.write_u8(0).await?;
-                return Ok(());
-            }
-            for (key, value) in reference {
-                cursor.write_u8(value.get_tag_bit()).await?;
-                write_string(&mut cursor, key).await?;
-                write_tag(&mut cursor, value).await?;
-            }
-            cursor.write_u8(0).await?;
-            println!("Encoded {:?} as {:?}", reference, cursor.into_inner());
-
             if reference.is_empty() {
                 writer.write_u8(0).await?;
                 return Ok(());
