@@ -50,7 +50,7 @@ macro_rules! define_tags {
             pub struct $tag;
         )*
 
-        #[derive(Debug)]
+        #[derive(Debug, PartialEq, Clone)]
         pub enum Tag {
             $(
                 $tag($backing_ty),
@@ -319,6 +319,7 @@ define_tags! {
                 return Ok(());
             }
             for (key, value) in reference {
+                writer.write_u8(value.get_tag_bit()).await?;
                 write_string(writer, key).await?;
                 write_tag(writer, value).await?;
             }
@@ -366,7 +367,7 @@ define_tags! {
             accounter.account_bytes(24)?;
             let len = reader.read_i32().await?;
             accounter.account_bytes((4 * len) as u64)?;
-            let mut i_arr = vec![0i32; len as usize];
+            let mut i_arr = Vec::with_capacity(len as usize);
             for _ in 0..len {
                 i_arr.push(reader.read_i32().await?);
             }
@@ -389,12 +390,93 @@ define_tags! {
             accounter.account_bytes(24)?;
             let len = reader.read_i32().await?;
             accounter.account_bytes((8 * len) as u64)?;
-            let mut i_arr = vec![0i64; len as usize];
+            let mut i_arr = Vec::with_capacity(len as usize);
             for _ in 0..len {
                 i_arr.push(reader.read_i64().await?);
             }
             Ok(Tag::TagLongArray(i_arr))
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::nbt::{load_tag, read_string, write_string, write_tag, NbtAccounter, Tag};
+    use std::io::Cursor;
+
+    pub async fn __test_io(value: Tag) -> crate::prelude::Result<()> {
+        let mut cursor = Cursor::new(vec![]);
+        write_tag(&mut cursor, &value).await?;
+        let inner = cursor.into_inner();
+        eprintln!("Inner cursor: {:?}", inner);
+        let mut cursor = Cursor::new(inner);
+        let tag = load_tag(
+            &mut cursor,
+            value.get_tag_bit(),
+            0,
+            &mut NbtAccounter {
+                limit: 0,
+                current: 0,
+            },
+        )
+        .await?;
+        assert_eq!(tag, value);
+        Ok(())
+    }
+
+    macro_rules! test_io {
+        ($($test_name:ident, $value:expr),*) => {$(
+            #[tokio::test]
+            pub async fn $test_name() -> crate::prelude::Result<()> {
+                __test_io($value).await
+            }
+        )*};
+    }
+
+    macro_rules! create_map {
+        ($($key:expr, $value:expr),*) => {
+            {
+                let mut map = std::collections::HashMap::new();
+                $(
+                    map.insert($key, $value);
+                )*
+                map
+            }
+        }
+    }
+
+    test_io! {
+        test_tag_end, Tag::TagEnd(()),
+        test_tag_byte, Tag::TagByte(10),
+        test_tag_short, Tag::TagShort(20),
+        test_tag_int, Tag::TagInt(30),
+        test_tag_long, Tag::TagLong(40),
+        test_tag_float, Tag::TagFloat(12.30),
+        test_tag_double, Tag::TagDouble(20.30),
+        test_tag_byte_array, Tag::TagByteArray(vec![10, 20, 0, 5]),
+        test_tag_string, Tag::TagString(format!("test string")),
+        test_tag_list, Tag::TagList((2, vec![Tag::TagShort(10u16), Tag::TagShort(20), Tag::TagShort(9), Tag::TagShort(15)])),
+        test_tag_compound, Tag::CompoundTag(create_map!(format!("abc"), Tag::TagShort(15), format!("def"), Tag::TagFloat(12.30))),
+        test_tag_int_array, Tag::TagIntArray(vec![30, 23, 123, 955]),
+        test_tag_long_array, Tag::TagLongArray(vec![321423, 24312, 123123, 12312])
+    }
+
+    #[tokio::test]
+    pub async fn test_string_read_write_persistence() -> crate::prelude::Result<()> {
+        let ref_string = format!("Example String");
+        let mut cursor = Cursor::new(vec![]);
+        write_string(&mut cursor, &ref_string).await?;
+        let mut cursor = Cursor::new(cursor.into_inner());
+        let back = read_string(
+            &mut cursor,
+            &mut NbtAccounter {
+                limit: 0,
+                current: 0,
+            },
+        )
+        .await?;
+        assert_eq!(ref_string, back);
+        Ok(())
     }
 }
 

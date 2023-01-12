@@ -584,12 +584,12 @@ mod test {
     use crate::transport::packet::primitive::VarInt;
 
     crate::struct_packet_components! {
-        #[derive(Debug, Eq, PartialEq)]
+        #[derive(Eq, PartialEq)]
         Example<String> {
             v_int: VarInt,
             uu: i32
         }
-        #[derive(Debug, Eq, PartialEq)]
+        #[derive(Eq, PartialEq)]
         _Example2 {
             v_int: VarInt,
             uu: i32
@@ -597,7 +597,7 @@ mod test {
     }
 
     crate::enum_packet_components! {
-        #[derive(Debug, Eq, PartialEq)]
+        #[derive(Eq, PartialEq)]
         ExampleEnum {
             key: VarInt,
             Variant1 {
