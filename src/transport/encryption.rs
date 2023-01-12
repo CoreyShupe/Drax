@@ -160,6 +160,35 @@ mod tests {
     use tokio_test::assert_ok;
 
     #[tokio::test]
+    async fn test_multi_block_cipher_persistence() {
+        let key = [0x42; 16];
+        let iv = [0x24; 16];
+
+        let mut encryption = Encryption::new(&key.into(), &iv.into());
+        let mut decryption = Decryption::new(&key.into(), &iv.into());
+
+        let mut origin = vec![0u8, 5u8, 7u8, 10u8, 20u8];
+        let dst = origin.clone();
+
+        // run through gauntlet
+        super::encrypt(Pin::new(&mut encryption), origin.as_mut_slice().into());
+        assert_ne!(origin, dst);
+        super::decrypt(Pin::new(&mut decryption), origin.as_mut_slice().into());
+        assert_eq!(origin, dst);
+
+        let mut origin = vec![2u8, 7u8, 12u8, 4u8, 1u8];
+        let dst = origin.clone();
+
+        // run through gauntlet again
+        super::encrypt(Pin::new(&mut encryption), origin.as_mut_slice().into());
+        assert_ne!(origin, dst);
+        super::decrypt(Pin::new(&mut decryption), (&mut origin[0..2]).into());
+        assert_eq!(origin[0..2], dst[0..2]);
+        super::decrypt(Pin::new(&mut decryption), (&mut origin[2..5]).into());
+        assert_eq!(origin[2..5], dst[2..5]);
+    }
+
+    #[tokio::test]
     async fn test_async_read_persistence() {
         let key = [0x42; 16];
         let iv = [0x24; 16];

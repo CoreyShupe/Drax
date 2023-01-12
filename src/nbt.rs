@@ -525,11 +525,16 @@ impl<const LIMIT: u64, C> PacketComponent<C> for EnsuredCompoundTag<LIMIT> {
         write: &'a mut A,
     ) -> PinnedLivelyResult<'a, ()> {
         Box::pin(async move {
+            let mut buffer = Cursor::new(Vec::with_capacity(match Self::size(&component_ref)? {
+                Size::Dynamic(x) | Size::Constant(x) => x,
+            } as usize));
             match component_ref {
                 Some(tag) => {
-                    write.write_u8(10).await?;
-                    write_string(write, &format!("")).await?;
-                    write_tag(write, tag).await?;
+                    buffer.write_u8(10).await?;
+                    write_string(&mut buffer, &format!("")).await?;
+                    write_tag(&mut buffer, tag).await?;
+                    let inner = buffer.into_inner();
+                    write.write_all(&inner).await?;
                     Ok(())
                 }
                 None => {
