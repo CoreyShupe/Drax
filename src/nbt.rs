@@ -1,5 +1,6 @@
 use crate::prelude::{PacketComponent, Size};
 use crate::{throw_explain, PinnedLivelyResult};
+use std::io::Cursor;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub const COMPOUND_TAG_BIT: u8 = 10;
@@ -153,6 +154,9 @@ define_tags! {
             Ok(1)
         },
         fn write(writer, reference) {
+            let mut cursor = Cursor::new(vec![]);
+            cursor.write_u8(*reference).await?;
+            println!("Writing byte: {:?} -> {:?}", reference, cursor.into_inner());
             writer.write_u8(*reference).await?;
             Ok(())
         },
@@ -168,6 +172,9 @@ define_tags! {
             Ok(2)
         },
         fn write(writer, reference) {
+            let mut cursor = Cursor::new(vec![]);
+            cursor.write_u16(*reference).await?;
+            println!("Writing short: {:?} -> {:?}", reference, cursor.into_inner());
             writer.write_u16(*reference).await?;
             Ok(())
         },
@@ -182,6 +189,9 @@ define_tags! {
             Ok(4)
         },
         fn write(writer, reference) {
+            let mut cursor = Cursor::new(vec![]);
+            cursor.write_i32(*reference).await?;
+            println!("Writing int: {:?} -> {:?}", reference, cursor.into_inner());
             writer.write_i32(*reference).await?;
             Ok(())
         },
@@ -196,6 +206,9 @@ define_tags! {
             Ok(8)
         },
         fn write(writer, reference) {
+            let mut cursor = Cursor::new(vec![]);
+            cursor.write_i64(*reference).await?;
+            println!("Writing long: {:?} -> {:?}", reference, cursor.into_inner());
             writer.write_i64(*reference).await?;
             Ok(())
         },
@@ -210,6 +223,9 @@ define_tags! {
             Ok(4)
         },
         fn write(writer, reference) {
+            let mut cursor = Cursor::new(vec![]);
+            cursor.write_f32(*reference).await?;
+            println!("Writing float: {:?} -> {:?}", reference, cursor.into_inner());
             writer.write_f32(*reference).await?;
             Ok(())
         },
@@ -224,6 +240,9 @@ define_tags! {
             Ok(8)
         },
         fn write(writer, reference) {
+            let mut cursor = Cursor::new(vec![]);
+            cursor.write_f64(*reference).await?;
+            println!("Writing double: {:?} -> {:?}", reference, cursor.into_inner());
             writer.write_f64(*reference).await?;
             Ok(())
         },
@@ -238,6 +257,10 @@ define_tags! {
             Ok(4 + reference.len())
         },
         fn write(writer, reference) {
+            let mut cursor = Cursor::new(vec![]);
+            cursor.write_i32(reference.len() as i32).await?;
+            cursor.write_all(reference).await?;
+            println!("Writing byte array: {:?} -> {:?}", reference, cursor.into_inner());
             writer.write_i32(reference.len() as i32).await?;
             writer.write_all(reference).await?;
             Ok(())
@@ -257,6 +280,9 @@ define_tags! {
             size_string(reference)
         },
         fn write(writer, reference) {
+            let mut cursor = Cursor::new(vec![]);
+            write_string(&mut cursor, reference).await?;
+            println!("Writing string tag: {:?} -> {:?}", reference, cursor.into_inner());
             write_string(writer, reference).await
         },
         fn read(reader, accounter, _d) {
@@ -276,6 +302,14 @@ define_tags! {
             })
         },
         fn write(writer, reference) {
+            let mut cursor = Cursor::new(vec![]);
+            cursor.write_u8(reference.0).await?;
+            cursor.write_i32(reference.1.len() as i32).await?;
+            for tag in &reference.1 {
+                write_tag(&mut cursor, tag).await?;
+            }
+            println!("Writing list tag: {:?} -> {:?}", reference, cursor.into_inner());
+
             writer.write_u8(reference.0).await?;
             writer.write_i32(reference.1.len() as i32).await?;
             for tag in &reference.1 {
@@ -313,6 +347,19 @@ define_tags! {
             Ok(size + 1)
         },
         fn write(writer, reference) {
+            let mut cursor = Cursor::new(vec![]);
+            if reference.is_empty() {
+                cursor.write_u8(0).await?;
+                return Ok(());
+            }
+            for (key, value) in reference {
+                cursor.write_u8(value.get_tag_bit()).await?;
+                write_string(&mut cursor, key).await?;
+                write_tag(&mut cursor, value).await?;
+            }
+            cursor.write_u8(0).await?;
+            println!("Writing compound tag: {:?} -> {:?}", reference, cursor.into_inner());
+
             if reference.is_empty() {
                 writer.write_u8(0).await?;
                 return Ok(());
@@ -351,6 +398,12 @@ define_tags! {
             Ok(4 + (4 * reference.len()))
         },
         fn write(writer, reference) {
+            let mut cursor = Cursor::new(vec![]);
+            cursor.write_i32(reference.len() as i32).await?;
+            for item in reference {
+                cursor.write_i32(*item).await?;
+            }
+            println!("Writing tag int array: {:?} -> {:?}", reference, cursor.into_inner());
             writer.write_i32(reference.len() as i32).await?;
             for item in reference {
                 writer.write_i32(*item).await?;
@@ -365,6 +418,7 @@ define_tags! {
             for _ in 0..len {
                 i_arr.push(reader.read_i32().await?);
             }
+            println!("Read Int Array: {:?} ({:?})", len, i_arr);
             Ok(Tag::TagIntArray(i_arr))
         },
     },
@@ -374,6 +428,12 @@ define_tags! {
             Ok(4 + (8 * reference.len()))
         },
         fn write(writer, reference) {
+            let mut cursor = Cursor::new(vec![]);
+            cursor.write_i32(reference.len() as i32).await?;
+            for item in reference {
+                cursor.write_i64(*item).await?;
+            }
+            println!("Writing tag long array: {:?} -> {:?}", reference, cursor.into_inner());
             writer.write_i32(reference.len() as i32).await?;
             for item in reference {
                 writer.write_i64(*item).await?;
@@ -388,6 +448,7 @@ define_tags! {
             for _ in 0..len {
                 i_arr.push(reader.read_i64().await?);
             }
+            println!("Read Long Array: {:?} ({:?})", len, i_arr);
             Ok(Tag::TagLongArray(i_arr))
         },
     }
