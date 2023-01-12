@@ -17,6 +17,7 @@ aes = { version = "0.8.2", optional = true }
 # NBT
 cesu8 = { version = "1.1.0", optional = true }
 uuid = "1.2.2"
+anyhow = { version = "1.0.68", optional = true }
 
 [dependencies.serde]
 version = "1"
@@ -37,8 +38,9 @@ default-features = false
 [features]
 test = ["tokio/macros", "tokio/rt", "dep:tokio-test", "tokio/rt-multi-thread"]
 
-default = ["encryption", "serde", "macros"]
+default = ["encryption", "serde", "macros", "nbt"]
 
+anyhow = ["dep:anyhow"]
 encryption = ["cfb8", "aes"]
 nbt = ["cesu8"]
 serde = ["dep:serde", "serde_json"]

@@ -1,8 +1,6 @@
-use crate::throw_explain;
-use std::collections::hash_map::Keys;
+use crate::prelude::{PacketComponent, Size};
+use crate::{throw_explain, PinnedLivelyResult};
 use std::collections::HashMap;
-use std::future::Future;
-use std::pin::Pin;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub const COMPOUND_TAG_BIT: u8 = 10;
@@ -13,8 +11,11 @@ pub struct NbtAccounter {
 }
 
 impl NbtAccounter {
-    fn account_bits(&mut self, bits: u64) -> crate::prelude::Result<()> {
-        match self.current.checked_add(bits) {
+    pub fn account_bytes(&mut self, bytes: u64) -> crate::prelude::Result<()> {
+        if self.limit == 0 {
+            return Ok(());
+        }
+        match self.current.checked_add(bytes) {
             Some(next) => {
                 if next > self.limit {
                     throw_explain!(format!(
@@ -30,537 +31,432 @@ impl NbtAccounter {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum Tag {
-    EndTag,
-    ByteTag(u8),
-    ShortTag(i16),
-    IntTag(i32),
-    LongTag(i64),
-    FloatTag(f32),
-    DoubleTag(f64),
-    ByteArrayTag(Vec<u8>),
-    StringTag(String),
-    ListTag(u8, Vec<Tag>),
-    CompoundTag(CompoundTag),
-    IntArrayTag(Vec<i32>),
-    LongArrayTag(Vec<i64>),
-}
-
-impl Tag {
-    pub fn byte_tag<I: Into<u8>>(i: I) -> Tag {
-        Tag::ByteTag(i.into())
-    }
-    pub fn short_tag<I: Into<i16>>(i: I) -> Tag {
-        Tag::ShortTag(i.into())
-    }
-    pub fn int_tag<I: Into<i32>>(i: I) -> Tag {
-        Tag::IntTag(i.into())
-    }
-    pub fn long_tag<I: Into<i64>>(i: I) -> Tag {
-        Tag::LongTag(i.into())
-    }
-    pub fn float_tag<I: Into<f32>>(i: I) -> Tag {
-        Tag::FloatTag(i.into())
-    }
-    pub fn double_tag<I: Into<f64>>(i: I) -> Tag {
-        Tag::DoubleTag(i.into())
-    }
-    pub fn byte_array_tag<I: Into<Vec<u8>>>(i: I) -> Tag {
-        Tag::ByteArrayTag(i.into())
-    }
-    pub fn string_tag<I: Into<String>>(i: I) -> Tag {
-        Tag::StringTag(i.into())
-    }
-    pub fn int_array_tag<I: Into<Vec<i32>>>(i: I) -> Tag {
-        Tag::IntArrayTag(i.into())
-    }
-    pub fn long_array_tag<I: Into<Vec<i64>>>(i: I) -> Tag {
-        Tag::LongArrayTag(i.into())
-    }
-}
-
-impl From<u8> for Tag {
-    fn from(into: u8) -> Self {
-        Tag::byte_tag(into)
-    }
-}
-
-impl From<i16> for Tag {
-    fn from(into: i16) -> Self {
-        Tag::short_tag(into)
-    }
-}
-
-impl From<i32> for Tag {
-    fn from(into: i32) -> Self {
-        Tag::int_tag(into)
-    }
-}
-
-impl From<i64> for Tag {
-    fn from(into: i64) -> Self {
-        Tag::long_tag(into)
-    }
-}
-
-impl From<f32> for Tag {
-    fn from(into: f32) -> Self {
-        Tag::float_tag(into)
-    }
-}
-
-impl From<f64> for Tag {
-    fn from(into: f64) -> Self {
-        Tag::double_tag(into)
-    }
-}
-
-impl From<Vec<u8>> for Tag {
-    fn from(into: Vec<u8>) -> Self {
-        Tag::byte_array_tag(into)
-    }
-}
-
-impl From<String> for Tag {
-    fn from(into: String) -> Self {
-        Tag::string_tag(into)
-    }
-}
-
-impl From<&str> for Tag {
-    fn from(into: &str) -> Self {
-        Tag::string_tag(into)
-    }
-}
-
-impl From<&String> for Tag {
-    fn from(into: &String) -> Self {
-        Tag::string_tag(into)
-    }
-}
-
-impl From<Vec<i32>> for Tag {
-    fn from(into: Vec<i32>) -> Self {
-        Tag::int_array_tag(into)
-    }
-}
-
-impl From<Vec<i64>> for Tag {
-    fn from(into: Vec<i64>) -> Self {
-        Tag::long_array_tag(into)
-    }
-}
-
-impl From<CompoundTag> for Tag {
-    fn from(ctg: CompoundTag) -> Self {
-        Tag::CompoundTag(ctg)
-    }
-}
-
-impl From<Vec<CompoundTag>> for Tag {
-    fn from(into: Vec<CompoundTag>) -> Self {
-        Tag::ListTag {
-            0: COMPOUND_TAG_BIT,
-            1: into.into_iter().map(Tag::CompoundTag).collect(),
+macro_rules! define_tags {
+    ($(
+        $tag:ident {
+            const type = $backing_ty:ty;
+            fn size($size_ref_ident:ident) {
+                $($sizer_tt:tt)*
+            },
+            fn write($writer:ident, $write_ref_ident:ident) {
+                $($writer_tt:tt)*
+            },
+            fn read($reader:ident, $accounter:ident, $depth:ident) {
+                $($reader_tt:tt)*
+            },
         }
-    }
-}
+    ),*) => {
+        $(
+            pub struct $tag;
+        )*
 
-impl From<Vec<Tag>> for Tag {
-    fn from(into: Vec<Tag>) -> Self {
-        Tag::ListTag {
-            0: COMPOUND_TAG_BIT,
-            1: into,
+        pub enum Tag {
+            $(
+                $tag($backing_ty),
+            )*
         }
-    }
-}
 
-impl Tag {
-    pub fn get_bit(&self) -> u8 {
-        match self {
-            Tag::EndTag => 0,
-            Tag::ByteTag(_) => 1,
-            Tag::ShortTag(_) => 2,
-            Tag::IntTag(_) => 3,
-            Tag::LongTag(_) => 4,
-            Tag::FloatTag(_) => 5,
-            Tag::DoubleTag(_) => 6,
-            Tag::ByteArrayTag(_) => 7,
-            Tag::StringTag(_) => 8,
-            Tag::ListTag(_, _) => 9,
-            Tag::CompoundTag(_) => COMPOUND_TAG_BIT,
-            Tag::IntArrayTag(_) => 11,
-            Tag::LongArrayTag(_) => 12,
+        impl Tag {
+            pub fn get_tag_bit(&self) -> u8 {
+                match self {
+                    $(
+                    Tag::$tag(_) => ${index(0)},
+                    )*
+                }
+            }
         }
-    }
-}
 
-async fn skip_bytes<R: AsyncRead + Unpin + ?Sized, I: Into<u64>>(
-    read: &mut R,
-    i: I,
-) -> crate::prelude::Result<()> {
-    let taken = i.into();
-    let a = tokio::io::copy(&mut read.take(taken), &mut tokio::io::sink()).await?;
-    if taken != a {
-        throw_explain!(format!(
-            "Failed to skip correct number of bytes, only skipped {} out of {}",
-            a, taken
-        ));
-    }
-    Ok(())
-}
+        pub fn load_tag<'a, R: $crate::prelude::AsyncRead + Unpin + ?Sized>(read: &'a mut R, bit: u8, depth: i32, accounter: &'a mut $crate::nbt::NbtAccounter) -> $crate::PinnedLivelyResult<'a, Tag> {
+            Box::pin(async move {
+                match bit {
+                    $(
+                    ${index(0)} => {
+                        let $reader = read;
+                        let $accounter = accounter;
+                        let $depth = depth;
+                        $($reader_tt)*
+                    }
+                    )*
+                    _ => $crate::throw_explain!(format!("Invalid bit {} found while loading tag.", bit))
+                }
+            })
+        }
 
-async fn skip_string<R: AsyncRead + Unpin + ?Sized>(read: &mut R) -> crate::prelude::Result<()> {
-    let skipped = read.read_u16().await?;
-    skip_bytes(read, skipped).await?;
-    Ok(())
+        pub fn write_tag<'a, W: $crate::prelude::AsyncWrite + Unpin + ?Sized>(write: &'a mut W, tag: &'a Tag) -> $crate::PinnedLivelyResult<'a, ()> {
+            Box::pin(async move {
+                match tag {
+                    $(
+                    Tag::$tag($write_ref_ident) => {
+                        let $writer = write;
+                        $($writer_tt)*
+                    }
+                    )*
+                }
+            })
+        }
+
+        pub fn size_tag(tag: &Tag) -> $crate::prelude::Result<usize> {
+            match tag {
+                $(
+                Tag::$tag($size_ref_ident) => {
+                    $($sizer_tt)*
+                }
+                )*
+            }
+        }
+    };
 }
 
 async fn read_string<R: AsyncRead + Unpin + ?Sized>(
     read: &mut R,
+    accounter: &mut NbtAccounter,
 ) -> crate::prelude::Result<String> {
-    let str_len = read.read_u16().await?;
-    if str_len == 0 {
-        return Ok(String::new());
-    }
-    let mut bytes = vec![0u8; str_len as usize];
-    let mut bytes_read = 0;
-    while bytes_read < bytes.len() {
-        match read.read(&mut bytes[bytes_read..]).await? {
-            0 => throw_explain!("Invalid NBT string, under read."),
-            n => bytes_read += n,
-        }
-    }
-    Ok(cesu8::from_java_cesu8(&bytes)?.to_string())
-}
-
-fn size_string(string: &str) -> usize {
-    4 + cesu8::to_java_cesu8(string).len()
+    let len = read.read_u16().await?;
+    let mut bytes = vec![0u8; len as usize];
+    read.read_exact(&mut bytes).await?;
+    let string = cesu8::from_java_cesu8(&bytes)?.to_string();
+    accounter.account_bytes(string.len() as u64)?;
+    Ok(string)
 }
 
 async fn write_string<W: AsyncWrite + Unpin + ?Sized>(
     write: &mut W,
-    string: &String,
+    reference: &String,
 ) -> crate::prelude::Result<()> {
-    write.write_u16(string.len() as u16).await?;
-    write.write_all(&cesu8::to_java_cesu8(string)).await?;
+    write.write_u16(reference.len() as u16).await?;
+    write.write_all(&cesu8::to_java_cesu8(reference)).await?;
     Ok(())
 }
 
-async fn write_compound_tag<W: AsyncWrite + Unpin + ?Sized>(
-    tag: &CompoundTag,
-    write: &mut W,
-) -> crate::prelude::Result<()> {
-    for (key, value) in &tag.mappings {
-        let id = value.get_bit();
-        write.write_u8(id).await?;
-        if id == 0 {
-            return Ok(());
-        }
-        write_string(write, key).await?;
-        write_tag(value, write).await?;
-    }
-    write.write_u8(0).await?;
-    Ok(())
+fn size_string(reference: &String) -> crate::prelude::Result<usize> {
+    Ok(2 + cesu8::to_java_cesu8(reference).len())
 }
 
-fn size_compound_tag(tag: &CompoundTag) -> usize {
-    let mut size = 0;
-    for (key, value) in &tag.mappings {
-        let id = value.get_bit();
-        if id == 0 {
-            return size + 1;
-        }
-        size += 1 + size_string(key);
-        size += size_tag(value);
-    }
-    size + 1
-}
+define_tags! {
+    TagEnd {
+        const type = ();
+        fn size(_s) {
+            Ok(0)
+        },
+        fn write(_w, _s) {
+            Ok(())
+        },
+        fn read(_r, accounter, _d) {
+            accounter.account_bytes(8)?;
+            Ok(Tag::TagEnd(()))
+        },
+    },
+    TagByte {
+        const type = u8;
+        fn size(_reference) {
+            Ok(1)
+        },
+        fn write(writer, reference) {
+            writer.write_u8(*reference).await?;
+            Ok(())
+        },
 
-fn write_tag<'a, W: AsyncWrite + Unpin + ?Sized>(
-    tag: &'a Tag,
-    write: &'a mut W,
-) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
-    Box::pin(async move {
-        match tag {
-            Tag::EndTag => Ok(()),
-            Tag::ByteTag(byte) => write.write_u8(*byte).await.map_err(Into::into),
-            Tag::ShortTag(short) => write.write_i16(*short).await.map_err(Into::into),
-            Tag::IntTag(int) => write.write_i32(*int).await.map_err(Into::into),
-            Tag::LongTag(long) => write.write_i64(*long).await.map_err(Into::into),
-            Tag::FloatTag(float) => write.write_f32(*float).await.map_err(Into::into),
-            Tag::DoubleTag(double) => write.write_f64(*double).await.map_err(Into::into),
-            Tag::ByteArrayTag(b_arr) => {
-                write.write_i32(b_arr.len() as i32).await?;
-                write.write_all(b_arr).await?;
-                Ok(())
-            }
-            Tag::StringTag(string) => write_string(write, string).await,
-            Tag::ListTag(tag_type, tags) => {
-                write.write_u8(*tag_type).await?;
-                write.write_i32(tags.len() as i32).await?;
-                for tag in tags {
-                    write_tag(tag, write).await?;
+        fn read(reader, accounter, _d) {
+            accounter.account_bytes(9)?;
+            Ok(Tag::TagByte(reader.read_u8().await?))
+        },
+    },
+    TagShort {
+        const type = u16;
+        fn size(_reference) {
+            Ok(2)
+        },
+        fn write(writer, reference) {
+            writer.write_u16(*reference).await?;
+            Ok(())
+        },
+        fn read(reader, accounter, _d) {
+            accounter.account_bytes(10)?;
+            Ok(Tag::TagShort(reader.read_u16().await?))
+        },
+    },
+    TagInt {
+        const type = i32;
+        fn size(_reference) {
+            Ok(4)
+        },
+        fn write(writer, reference) {
+            writer.write_i32(*reference).await?;
+            Ok(())
+        },
+        fn read(reader, accounter, _d) {
+            accounter.account_bytes(12)?;
+            Ok(Tag::TagInt(reader.read_i32().await?))
+        },
+    },
+    TagLong {
+        const type = i64;
+        fn size(_reference) {
+            Ok(8)
+        },
+        fn write(writer, reference) {
+            writer.write_i64(*reference).await?;
+            Ok(())
+        },
+        fn read(reader, accounter, _d) {
+            accounter.account_bytes(16)?;
+            Ok(Tag::TagLong(reader.read_i64().await?))
+        },
+    },
+    TagFloat {
+        const type = f32;
+        fn size(_reference) {
+            Ok(4)
+        },
+        fn write(writer, reference) {
+            writer.write_f32(*reference).await?;
+            Ok(())
+        },
+        fn read(reader, accounter, _d) {
+            accounter.account_bytes(12)?;
+            Ok(Tag::TagFloat(reader.read_f32().await?))
+        },
+    },
+    TagDouble {
+        const type = f64;
+        fn size(_reference) {
+            Ok(8)
+        },
+        fn write(writer, reference) {
+            writer.write_f64(*reference).await?;
+            Ok(())
+        },
+        fn read(reader, accounter, _d) {
+            accounter.account_bytes(16)?;
+            Ok(Tag::TagDouble(reader.read_f64().await?))
+        },
+    },
+    TagByteArray {
+        const type = Vec<u8>;
+        fn size(reference) {
+            Ok(4 + reference.len())
+        },
+        fn write(writer, reference) {
+            writer.write_i32(reference.len() as i32).await?;
+            writer.write_all(reference).await?;
+            Ok(())
+        },
+        fn read(reader, accounter, _d) {
+            accounter.account_bytes(24)?;
+            let len = reader.read_i32().await?;
+            accounter.account_bytes(len as u64)?;
+            let mut bytes = vec![0u8; len as usize];
+            reader.read_exact(&mut bytes).await?;
+            Ok(Tag::TagByteArray(bytes))
+        },
+    },
+    TagString {
+        const type = String;
+        fn size(reference) {
+            size_string(reference)
+        },
+        fn write(writer, reference) {
+            write_string(writer, reference).await
+        },
+        fn read(reader, accounter, _d) {
+            accounter.account_bytes(36)?;
+            Ok(Tag::TagString(read_string(reader, accounter).await?))
+        },
+    },
+    TagList {
+        const type = (u8, Vec<Tag>);
+        fn size(reference) {
+            Ok(5 + {
+                let mut size = 0;
+                for item in &reference.1 {
+                    size += size_tag(item)?;
                 }
-                Ok(())
+                size
+            })
+        },
+        fn write(writer, reference) {
+            writer.write_u8(reference.0).await?;
+            writer.write_i32(reference.1.len() as i32).await?;
+            for tag in &reference.1 {
+                write_tag(writer, tag).await?;
             }
-            Tag::CompoundTag(tag) => write_compound_tag(tag, write).await,
-            Tag::IntArrayTag(i_arr) => {
-                write.write_i32(i_arr.len() as i32).await?;
-                for i in i_arr {
-                    write.write_i32(*i).await?;
-                }
-                Ok(())
+            Ok(())
+        },
+        fn read(reader, accounter, depth) {
+            accounter.account_bytes(37)?;
+            if depth > 512 {
+                throw_explain!("NBT tag too complex. Depth surpassed 512.")
             }
-            Tag::LongArrayTag(l_arr) => {
-                write.write_i32(l_arr.len() as i32).await?;
-                for l in l_arr {
-                    write.write_i64(*l).await?;
-                }
-                Ok(())
+            let tag_byte = reader.read_u8().await?;
+            let length = reader.read_i32().await?;
+            accounter.account_bytes((4 * length) as u64)?;
+            let mut v = Vec::with_capacity(length as usize);
+            for _ in 0..length {
+                v.push(load_tag(reader, tag_byte, depth + 1, accounter).await?);
             }
-        }
-    })
-}
+            Ok(Tag::TagList((tag_byte, v)))
+        },
+    },
+    CompoundTag {
+        const type = HashMap<String, Tag>;
+        fn size(reference) {
+            if reference.is_empty() {
+                return Ok(1);
+            }
 
-fn size_tag(tag: &Tag) -> usize {
-    match tag {
-        Tag::EndTag => 0,
-        Tag::ByteTag(_) => 1,
-        Tag::ShortTag(_) => 2,
-        Tag::IntTag(_) => 4,
-        Tag::LongTag(_) => 8,
-        Tag::FloatTag(_) => 4,
-        Tag::DoubleTag(_) => 8,
-        Tag::ByteArrayTag(b_arr) => b_arr.len() + 4,
-        Tag::StringTag(string) => size_string(string),
-        Tag::ListTag(_, tags) => {
-            let mut size = 5;
-            for tag in tags {
-                size += size_tag(tag);
+            let mut size = 0;
+            for (key, value) in reference {
+                size += size_string(key)? + 1;
+                size += size_tag(value)?;
             }
-            size
-        }
-        Tag::CompoundTag(tag) => size_compound_tag(tag),
-        Tag::IntArrayTag(i_arr) => (i_arr.len() * 4) + 4,
-        Tag::LongArrayTag(l_arr) => (l_arr.len() * 8) + 4,
+            Ok(size + 1)
+        },
+        fn write(writer, reference) {
+            if reference.is_empty() {
+                writer.write_u8(0).await?;
+                return Ok(());
+            }
+            for (key, value) in reference {
+                write_string(writer, key).await?;
+                write_tag(writer, value).await?;
+            }
+            writer.write_u8(0).await?;
+            Ok(())
+        },
+        fn read(reader, accounter, depth) {
+            accounter.account_bytes(48)?;
+            if depth > 512 {
+                throw_explain!("NBT tag too complex. Depth surpassed 512.")
+            }
+            let mut map = HashMap::new();
+            loop {
+                let tag_byte = reader.read_u8().await?;
+                if tag_byte == 0 {
+                    break;
+                }
+                accounter.account_bytes(28)?;
+                let key = read_string(reader, accounter).await?;
+                let data = load_tag(reader, tag_byte, depth + 1, accounter).await?;
+
+                if map.contains_key(&key) {
+                    map.insert(key, data);
+                    continue;
+                }
+                map.insert(key, data);
+                accounter.account_bytes(36)?;
+            }
+            Ok(Tag::CompoundTag(map))
+        },
+    },
+    TagIntArray {
+        const type = Vec<i32>;
+        fn size(reference) {
+            Ok(4 + (4 * reference.len()))
+        },
+        fn write(writer, reference) {
+            writer.write_i32(reference.len() as i32).await?;
+            for item in reference {
+                writer.write_i32(*item).await?;
+            }
+            Ok(())
+        },
+        fn read(reader, accounter, _d) {
+            accounter.account_bytes(24)?;
+            let len = reader.read_i32().await?;
+            accounter.account_bytes((4 * len) as u64)?;
+            let mut i_arr = vec![0i32; len as usize];
+            for _ in 0..len {
+                i_arr.push(reader.read_i32().await?);
+            }
+            Ok(Tag::TagIntArray(i_arr))
+        },
+    },
+    TagLongArray {
+        const type = Vec<i64>;
+        fn size(reference) {
+            Ok(4 + (8 * reference.len()))
+        },
+        fn write(writer, reference) {
+            writer.write_i32(reference.len() as i32).await?;
+            for item in reference {
+                writer.write_i64(*item).await?;
+            }
+            Ok(())
+        },
+        fn read(reader, accounter, _d) {
+            accounter.account_bytes(24)?;
+            let len = reader.read_i32().await?;
+            accounter.account_bytes((8 * len) as u64)?;
+            let mut i_arr = vec![0i64; len as usize];
+            for _ in 0..len {
+                i_arr.push(reader.read_i64().await?);
+            }
+            Ok(Tag::TagLongArray(i_arr))
+        },
     }
 }
 
-fn load_tag<'a, R: AsyncRead + Unpin + ?Sized>(
-    tag_bit: u8,
-    read: &'a mut R,
-    depth: usize,
-    accounter: &'a mut NbtAccounter,
-) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Tag>> + 'a>> {
-    Box::pin(async move {
-        match tag_bit {
-            0 => {
-                accounter.account_bits(64)?;
-                Ok(Tag::EndTag)
-            }
-            1 => {
-                accounter.account_bits(72)?;
-                Ok(Tag::ByteTag(read.read_u8().await?))
-            }
-            2 => {
-                accounter.account_bits(80)?;
-                Ok(Tag::ShortTag(read.read_i16().await?))
-            }
-            3 => {
-                accounter.account_bits(96)?;
-                Ok(Tag::IntTag(read.read_i32().await?))
-            }
-            4 => {
-                accounter.account_bits(128)?;
-                Ok(Tag::LongTag(read.read_i64().await?))
-            }
-            5 => {
-                accounter.account_bits(96)?;
-                Ok(Tag::FloatTag(read.read_f32().await?))
-            }
-            6 => {
-                accounter.account_bits(128)?;
-                Ok(Tag::DoubleTag(read.read_f64().await?))
-            }
-            7 => {
-                accounter.account_bits(192)?;
-                let size = read.read_i32().await?;
-                accounter.account_bits(8 * (size as u64))?;
-                let mut bytes = vec![0u8; size as usize];
-                read.read_exact(&mut bytes).await?;
-                Ok(Tag::ByteArrayTag(bytes))
-            }
-            8 => {
-                accounter.account_bits(288)?;
-                let string = read_string(read).await?;
-                accounter.account_bits(16 * (string.len() as u64))?;
-                Ok(Tag::StringTag(string))
-            }
-            9 => {
-                accounter.account_bits(296)?;
-                if depth > 512 {
-                    throw_explain!("Nbt tag depth exceeded 512.");
-                }
-
-                let list_tag_type = read.read_u8().await?;
-                let list_len = read.read_i32().await?;
-                if list_tag_type == 0 && list_len > 0 {
-                    throw_explain!("Missing type on list tag.");
-                }
-
-                accounter.account_bits(32 * (list_len as u64))?;
-
-                let mut tags = Vec::new();
-                for _ in 0..list_len {
-                    tags.push(load_tag(list_tag_type, read, depth + 1, accounter).await?);
-                }
-                Ok(Tag::ListTag(list_tag_type, tags))
-            }
-            10 => {
-                accounter.account_bits(384)?;
-                if depth > 512 {
-                    throw_explain!("Nbt tag depth exceeded 512.");
-                }
-                let mut mappings = HashMap::new();
-
-                let mut next_byte: u8;
-                while {
-                    next_byte = read.read_u8().await?;
-                    next_byte != 0
-                } {
-                    let tag_name = read_string(read).await?;
-                    accounter.account_bits(224 + (16 * (tag_name.len() as u64)))?;
-                    let tag = load_tag(next_byte, read, depth + 1, accounter).await?;
-                    if mappings.insert(tag_name, tag).is_some() {
-                        accounter.account_bits(288)?;
-                    }
-                }
-                Ok(Tag::CompoundTag(CompoundTag { mappings }))
-            }
-            11 => {
-                accounter.account_bits(192)?;
-                let len = read.read_i32().await?;
-                accounter.account_bits(32 * (len as u64))?;
-                let mut i_arr = vec![0i32; len as usize];
-                for _ in 0..len {
-                    i_arr.push(read.read_i32().await?);
-                }
-                Ok(Tag::IntArrayTag(i_arr))
-            }
-            12 => {
-                accounter.account_bits(192)?;
-                let len = read.read_i32().await?;
-                accounter.account_bits(64 * (len as u64))?;
-                let mut l_arr = vec![0i64; len as usize];
-                for _ in 0..len {
-                    l_arr.push(read.read_i64().await?);
-                }
-                Ok(Tag::LongArrayTag(l_arr))
-            }
-            _ => throw_explain!(format!("Unknown tag bit {}", tag_bit)),
-        }
-    })
+pub enum EnsuredCompoundTag<const LIMIT: u64 = 0> {
+    Tagged(Tag),
+    NoTag,
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct CompoundTag {
-    mappings: HashMap<String, Tag>,
-}
+impl<const LIMIT: u64, C> PacketComponent<C> for EnsuredCompoundTag<LIMIT> {
+    type ComponentType = EnsuredCompoundTag<LIMIT>;
 
-impl CompoundTag {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn put_tag<S: Into<String>>(&mut self, location: S, tag: Tag) {
-        self.mappings.insert(location.into(), tag);
-    }
-
-    pub fn get_tag(&self, location: &String) -> Option<&Tag> {
-        self.mappings.get(location)
-    }
-
-    pub fn tags(&self) -> Keys<'_, String, Tag> {
-        self.mappings.keys()
-    }
-}
-
-pub async fn read_nbt<R: AsyncRead + Unpin + ?Sized>(
-    read: &mut R,
-    limit: u64,
-) -> crate::prelude::Result<Option<CompoundTag>> {
-    let mut accounter = NbtAccounter { limit, current: 0 };
-    let bit = read.read_u8().await?;
-    if bit == 0 {
-        return Ok(None);
-    } else if bit != COMPOUND_TAG_BIT {
-        throw_explain!("Root tag must be a compound tag.")
-    }
-    skip_string(read).await?;
-    match load_tag(bit, read, 0, &mut accounter).await? {
-        Tag::CompoundTag(tag) => Ok(Some(tag)),
-        _ => throw_explain!("Invalid root tag loaded."),
-    }
-}
-
-pub async fn write_nbt<W: AsyncWrite + Unpin + ?Sized>(
-    tag: &CompoundTag,
-    writer: &mut W,
-) -> crate::prelude::Result<()> {
-    writer.write_u8(COMPOUND_TAG_BIT).await?;
-    write_string(writer, &String::new()).await?;
-    write_compound_tag(tag, writer).await
-}
-
-pub async fn write_optional_nbt<W: AsyncWrite + Unpin + ?Sized>(
-    tag: &Option<CompoundTag>,
-    writer: &mut W,
-) -> crate::prelude::Result<()> {
-    match tag.as_ref() {
-        Some(tag) => {
-            writer.write_u8(COMPOUND_TAG_BIT).await?;
-            write_string(writer, &String::new()).await?;
-            write_compound_tag(tag, writer).await?;
-        }
-        None => writer.write_all(&[0u8]).await?,
-    }
-    Ok(())
-}
-
-pub fn size_nbt(tag: &CompoundTag) -> usize {
-    size_compound_tag(tag)
-}
-
-pub fn size_optional_nbt(tag: &Option<CompoundTag>) -> usize {
-    match tag.as_ref() {
-        Some(tag) => size_compound_tag(tag),
-        None => 1,
-    }
-}
-
-#[macro_export]
-macro_rules! ctg {
-    ($($name:literal:
-        $(($($true_tokens:tt)*))?
-        $([$($vec_tokens:tt)*])?
-        $({$($ctg_tokens:tt)*})?
-        $($v:literal)?
-        $($i:ident)?
-    ),*) => {
-        {
-            let mut tag = $crate::nbt::CompoundTag::new();
-            $(
-                tag.put_tag($name, $crate::nbt::Tag::from(
-                    $($v)?
-                    $($i)?
-                    $($($true_tokens)*)?
-                    $($crate::ctg! {$($ctg_tokens)*})?
-                    $(vec![$($vec_tokens)*])?
+    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+        _: &'a mut C,
+        read: &'a mut A,
+    ) -> PinnedLivelyResult<'a, Self::ComponentType> {
+        Box::pin(async move {
+            let b = read.read_u8().await?;
+            if b == 0 {
+                return Ok(EnsuredCompoundTag::NoTag);
+            }
+            if b != 10 {
+                throw_explain!(format!(
+                    "Invalid tag bit. Expected compound tag; received {}",
+                    b
                 ));
-            )*
-            tag
+            }
+            let mut accounter = NbtAccounter {
+                limit: LIMIT,
+                current: 0,
+            };
+            let _ = read_string(read, &mut accounter).await?;
+            let tag = load_tag(read, b, 0, &mut accounter).await?;
+            Ok(EnsuredCompoundTag::Tagged(tag))
+        })
+    }
+
+    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+        component_ref: &'a Self::ComponentType,
+        _: &'a mut C,
+        write: &'a mut A,
+    ) -> PinnedLivelyResult<'a, ()> {
+        Box::pin(async move {
+            match component_ref {
+                EnsuredCompoundTag::Tagged(tag) => {
+                    write.write_u8(10).await?;
+                    write_string(write, &format!("")).await?;
+                    write_tag(write, tag).await?;
+                    Ok(())
+                }
+                EnsuredCompoundTag::NoTag => {
+                    write.write_u8(0).await?;
+                    Ok(())
+                }
+            }
+        })
+    }
+
+    fn size(input: &Self::ComponentType, _: &mut C) -> crate::prelude::Result<Size> {
+        match input {
+            EnsuredCompoundTag::Tagged(tag) => {
+                let dynamic_size = Size::Dynamic(3); // short 0 for str + byte tag
+                Ok(dynamic_size + size_tag(tag)?)
+            }
+            EnsuredCompoundTag::NoTag => Ok(Size::Constant(1)),
         }
-    };
+    }
 }

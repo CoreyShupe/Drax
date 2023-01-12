@@ -71,6 +71,9 @@ pub mod error {
         Cesu8DecodingError(cesu8::Cesu8DecodingError),
         /// The error is caused by an unknown uuid error.
         UuidError(uuid::Error),
+        /// The error is caused by some anyhow propagator
+        #[cfg(feature = "anyhow")]
+        AnyhowError(anyhow::Error),
     }
 
     impl std::error::Error for TransportError {}
@@ -90,6 +93,8 @@ pub mod error {
                 #[cfg(feature = "nbt")]
                 ErrorType::Cesu8DecodingError(err) => write!(f, "Cesu8DecodingError {}", err),
                 ErrorType::UuidError(err) => write!(f, "UuidError {err}"),
+                #[cfg(feature = "anyhow")]
+                ErrorType::AnyhowError(err) => write!(f, "AnyhowError {err}"),
             }
         }
     }
@@ -176,6 +181,13 @@ pub mod error {
     impl From<uuid::Error> for ErrorType {
         fn from(value: uuid::Error) -> Self {
             Self::UuidError(value)
+        }
+    }
+
+    #[cfg(feature = "anyhow")]
+    impl From<anyhow::Error> for ErrorType {
+        fn from(value: anyhow::Error) -> Self {
+            Self::AnyhowError(value)
         }
     }
 
