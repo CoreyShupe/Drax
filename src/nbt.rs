@@ -408,7 +408,6 @@ mod tests {
         let mut cursor = Cursor::new(vec![]);
         write_tag(&mut cursor, &value).await?;
         let inner = cursor.into_inner();
-        eprintln!("Inner cursor: {:?}", inner);
         let mut cursor = Cursor::new(inner);
         let tag = load_tag(
             &mut cursor,
