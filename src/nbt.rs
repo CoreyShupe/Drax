@@ -418,7 +418,6 @@ define_tags! {
             for _ in 0..len {
                 i_arr.push(reader.read_i32().await?);
             }
-            println!("Read Int Array: {:?} ({:?})", len, i_arr);
             Ok(Tag::TagIntArray(i_arr))
         },
     },
@@ -448,7 +447,6 @@ define_tags! {
             for _ in 0..len {
                 i_arr.push(reader.read_i64().await?);
             }
-            println!("Read Long Array: {:?} ({:?})", len, i_arr);
             Ok(Tag::TagLongArray(i_arr))
         },
     }
