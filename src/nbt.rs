@@ -1,6 +1,5 @@
 use crate::prelude::{PacketComponent, Size};
 use crate::{throw_explain, PinnedLivelyResult};
-use std::collections::HashMap;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub const COMPOUND_TAG_BIT: u8 = 10;
@@ -300,7 +299,7 @@ define_tags! {
         },
     },
     CompoundTag {
-        const type = HashMap<String, Tag>;
+        const type = Vec<(String, Tag)>;
         fn size(reference) {
             if reference.is_empty() {
                 return Ok(1);
@@ -331,7 +330,7 @@ define_tags! {
             if depth > 512 {
                 throw_explain!("NBT tag too complex. Depth surpassed 512.")
             }
-            let mut map = HashMap::new();
+            let mut map = Vec::new();
             loop {
                 let tag_byte = reader.read_u8().await?;
                 if tag_byte == 0 {
@@ -340,12 +339,7 @@ define_tags! {
                 accounter.account_bytes(28)?;
                 let key = read_string(reader, accounter).await?;
                 let data = load_tag(reader, tag_byte, depth + 1, accounter).await?;
-
-                if map.contains_key(&key) {
-                    map.insert(key, data);
-                    continue;
-                }
-                map.insert(key, data);
+                map.push((key, data));
                 accounter.account_bytes(36)?;
             }
             Ok(Tag::CompoundTag(map))
@@ -434,13 +428,7 @@ mod tests {
 
     macro_rules! create_map {
         ($($key:expr, $value:expr),*) => {
-            {
-                let mut map = std::collections::HashMap::new();
-                $(
-                    map.insert($key, $value);
-                )*
-                map
-            }
+            vec![$(($key, $value)),*]
         }
     }
 
