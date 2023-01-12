@@ -50,6 +50,7 @@ macro_rules! define_tags {
             pub struct $tag;
         )*
 
+        #[derive(Debug)]
         pub enum Tag {
             $(
                 $tag($backing_ty),
@@ -396,6 +397,7 @@ define_tags! {
     }
 }
 
+#[derive(Debug)]
 pub enum EnsuredCompoundTag<const LIMIT: u64 = 0> {
     Tagged(Tag),
     NoTag,
