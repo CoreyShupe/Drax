@@ -111,6 +111,7 @@ pub mod vec;
 
 #[cfg(feature = "macros")]
 pub mod macros {
+    #[macro_export]
     macro_rules! component_internal {
         ($(#[$($tt:tt)*])* enum $enum_name:ident {
             $key_name:ident: $key_delegate_type:ty,
@@ -199,7 +200,7 @@ pub mod macros {
                 )?
             })?
         ),*) => {
-            $(registry_internal! {
+            $($crate::component_internal! {
                 $(#[$($tt2)*])*
                 $(enum $component_enum_name$(<$c_e_ctx_ty>)? {
                     $c_key_name: $c_key_delegate_type,
