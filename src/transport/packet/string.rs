@@ -1,31 +1,26 @@
-use std::future::Future;
-use std::pin::Pin;
-
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-use crate::throw_explain;
 use crate::transport::buffer::var_num::size_var_int;
 use crate::transport::buffer::{DraxReadExt, DraxWriteExt};
 use crate::transport::packet::{PacketComponent, Size};
+use crate::{throw_explain, PinnedLivelyResult};
 
 const STRING_DEFAULT_CAP: i32 = 32767 * 4;
 
-impl<C> PacketComponent<C> for String {
+impl<C: Send + Sync> PacketComponent<C> for String {
     type ComponentType = Self;
 
-    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+    fn decode<'a, A: AsyncRead + Unpin + Send + Sync + ?Sized>(
         _: &'a mut C,
         read: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self>> + 'a>>
+    ) -> PinnedLivelyResult<'a, Self::ComponentType>
     where
         Self: Sized,
     {
         Box::pin(async move {
             let len = read.read_var_int().await?;
             if len > STRING_DEFAULT_CAP {
-                throw_explain!(format!(
-                    "String exceeded length bound {STRING_DEFAULT_CAP}"
-                ))
+                throw_explain!(format!("String exceeded length bound {STRING_DEFAULT_CAP}"))
             }
             let mut buf = vec![0; len as usize];
             read.read_exact(&mut buf).await?;
@@ -33,11 +28,11 @@ impl<C> PacketComponent<C> for String {
         })
     }
 
-    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+    fn encode<'a, A: AsyncWrite + Unpin + Send + Sync + ?Sized>(
         component_ref: &'a Self,
         _: &'a mut C,
         write: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+    ) -> PinnedLivelyResult<'a, ()> {
         Box::pin(async move {
             write.write_var_int(component_ref.len() as i32).await?;
             write.write_all(component_ref.as_bytes()).await?;
@@ -54,13 +49,13 @@ impl<C> PacketComponent<C> for String {
 
 pub struct LimitedString<const N: usize>;
 
-impl<C, const N: usize> PacketComponent<C> for LimitedString<N> {
+impl<C: Send + Sync, const N: usize> PacketComponent<C> for LimitedString<N> {
     type ComponentType = String;
 
-    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+    fn decode<'a, A: AsyncRead + Unpin + Send + Sync + ?Sized>(
         _: &'a mut C,
         read: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>> {
+    ) -> PinnedLivelyResult<'a, Self::ComponentType> {
         Box::pin(async move {
             let string_size = read.read_var_int().await?;
             if string_size > N as i32 * 4 {
@@ -76,11 +71,11 @@ impl<C, const N: usize> PacketComponent<C> for LimitedString<N> {
         })
     }
 
-    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+    fn encode<'a, A: AsyncWrite + Unpin + Send + Sync + ?Sized>(
         component_ref: &'a Self::ComponentType,
         context: &'a mut C,
         write: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+    ) -> PinnedLivelyResult<'a, ()> {
         if component_ref.len() > N * 4 {
             return Box::pin(async move {
                 throw_explain!(format!(

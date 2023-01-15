@@ -1,22 +1,22 @@
-use crate::transport::packet::{PacketComponent, Size};
-use std::future::Future;
-use std::pin::Pin;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+
+use crate::transport::packet::{PacketComponent, Size};
+use crate::PinnedLivelyResult;
 
 pub struct Maybe<T> {
     _phantom_t: T,
 }
 
-impl<C, T> PacketComponent<C> for Maybe<T>
+impl<C: Send + Sync, T> PacketComponent<C> for Maybe<T>
 where
     T: PacketComponent<C>,
 {
     type ComponentType = Option<T::ComponentType>;
 
-    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+    fn decode<'a, A: AsyncRead + Unpin + Send + Sync + ?Sized>(
         context: &'a mut C,
         read: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>> {
+    ) -> PinnedLivelyResult<'a, Self::ComponentType> {
         Box::pin(async move {
             let has_value = read.read_u8().await?;
             if has_value != 0x0 {
@@ -27,11 +27,11 @@ where
         })
     }
 
-    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+    fn encode<'a, A: AsyncWrite + Unpin + Send + Sync + ?Sized>(
         component_ref: &'a Self::ComponentType,
         context: &'a mut C,
         write: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+    ) -> PinnedLivelyResult<'a, ()> {
         Box::pin(async move {
             write
                 .write_u8(if component_ref.is_some() { 1 } else { 0 })

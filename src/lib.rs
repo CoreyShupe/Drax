@@ -33,8 +33,9 @@ pub mod prelude;
 pub mod transport;
 
 pub type PinnedLivelyResult<'a, T> =
-    Pin<Box<dyn std::future::Future<Output = transport::Result<T>> + 'a>>;
-pub type PinnedResult<T> = Pin<Box<dyn std::future::Future<Output = transport::Result<T>>>>;
+    Pin<Box<dyn std::future::Future<Output = transport::Result<T>> + 'a + Send + Sync>>;
+pub type PinnedResult<T> =
+    Pin<Box<dyn std::future::Future<Output = transport::Result<T>> + Send + Sync>>;
 
 /// Module for quickly accessing builtin delegates.
 pub mod delegates {}

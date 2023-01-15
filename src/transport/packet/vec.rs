@@ -1,24 +1,22 @@
-use std::future::Future;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
-use std::pin::Pin;
 
-use crate::throw_explain;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::transport::buffer::var_num::size_var_int;
 use crate::transport::buffer::{DraxReadExt, DraxWriteExt};
 use crate::transport::packet::{PacketComponent, Size};
+use crate::{throw_explain, PinnedLivelyResult};
 
 pub struct ByteDrain;
 
-impl<C> PacketComponent<C> for ByteDrain {
+impl<C: Send + Sync> PacketComponent<C> for ByteDrain {
     type ComponentType = Vec<u8>;
 
-    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+    fn decode<'a, A: AsyncRead + Unpin + Send + Sync + ?Sized>(
         _: &'a mut C,
         read: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>>
+    ) -> PinnedLivelyResult<'a, Self::ComponentType>
     where
         Self: Sized,
     {
@@ -29,11 +27,11 @@ impl<C> PacketComponent<C> for ByteDrain {
         })
     }
 
-    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+    fn encode<'a, A: AsyncWrite + Unpin + Send + Sync + ?Sized>(
         component_ref: &'a Self::ComponentType,
         _: &'a mut C,
         write: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+    ) -> PinnedLivelyResult<'a, ()> {
         Box::pin(async move {
             write.write_all(component_ref).await?;
             Ok(())
@@ -47,13 +45,13 @@ impl<C> PacketComponent<C> for ByteDrain {
 
 pub struct SliceU8<const N: usize>;
 
-impl<C, const N: usize> PacketComponent<C> for SliceU8<N> {
+impl<C: Send + Sync, const N: usize> PacketComponent<C> for SliceU8<N> {
     type ComponentType = [u8; N];
 
-    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+    fn decode<'a, A: AsyncRead + Unpin + Send + Sync + ?Sized>(
         _: &'a mut C,
         read: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>>
+    ) -> PinnedLivelyResult<'a, Self::ComponentType>
     where
         Self: Sized,
     {
@@ -64,32 +62,32 @@ impl<C, const N: usize> PacketComponent<C> for SliceU8<N> {
         })
     }
 
-    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+    fn encode<'a, A: AsyncWrite + Unpin + Send + Sync + ?Sized>(
         component_ref: &'a Self::ComponentType,
         _: &'a mut C,
         write: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+    ) -> PinnedLivelyResult<'a, ()> {
         Box::pin(async move {
             write.write_all(component_ref).await?;
             Ok(())
         })
     }
 
-    fn size(_: &Self::ComponentType, __: &mut C) -> crate::prelude::Result<Size> {
+    fn size(_: &Self::ComponentType, _: &mut C) -> crate::prelude::Result<Size> {
         Ok(Size::Constant(N))
     }
 }
 
-impl<C, T, const N: usize> PacketComponent<C> for [T; N]
+impl<C: Send + Sync, T, const N: usize> PacketComponent<C> for [T; N]
 where
     T: PacketComponent<C>,
 {
     type ComponentType = [T::ComponentType; N];
 
-    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+    fn decode<'a, A: AsyncRead + Unpin + Send + Sync + ?Sized>(
         context: &'a mut C,
         read: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>>
+    ) -> PinnedLivelyResult<'a, Self::ComponentType>
     where
         Self: Sized,
     {
@@ -102,11 +100,11 @@ where
         })
     }
 
-    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+    fn encode<'a, A: AsyncWrite + Unpin + Send + Sync + ?Sized>(
         component_ref: &'a Self::ComponentType,
         context: &'a mut C,
         write: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+    ) -> PinnedLivelyResult<'a, ()> {
         Box::pin(async move {
             for x in component_ref {
                 T::encode(x, context, write).await?;
@@ -129,13 +127,13 @@ where
 
 pub struct VecU8;
 
-impl<C> PacketComponent<C> for VecU8 {
+impl<C: Send + Sync> PacketComponent<C> for VecU8 {
     type ComponentType = Vec<u8>;
 
-    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+    fn decode<'a, A: AsyncRead + Unpin + Send + Sync + ?Sized>(
         _: &'a mut C,
         read: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>>
+    ) -> PinnedLivelyResult<'a, Self::ComponentType>
     where
         Self: Sized,
     {
@@ -147,11 +145,11 @@ impl<C> PacketComponent<C> for VecU8 {
         })
     }
 
-    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+    fn encode<'a, A: AsyncWrite + Unpin + Send + Sync + ?Sized>(
         component_ref: &'a Self::ComponentType,
         _: &'a mut C,
         write: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+    ) -> PinnedLivelyResult<'a, ()> {
         Box::pin(async move {
             write.write_var_int(component_ref.len() as i32).await?;
             write.write_all(component_ref).await?;
@@ -166,16 +164,16 @@ impl<C> PacketComponent<C> for VecU8 {
     }
 }
 
-impl<C, T> PacketComponent<C> for Vec<T>
+impl<C: Send + Sync, T> PacketComponent<C> for Vec<T>
 where
     T: PacketComponent<C>,
 {
     type ComponentType = Vec<T::ComponentType>;
 
-    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+    fn decode<'a, A: AsyncRead + Unpin + Send + Sync + ?Sized>(
         context: &'a mut C,
         read: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>>
+    ) -> PinnedLivelyResult<'a, Self::ComponentType>
     where
         Self: Sized,
     {
@@ -189,11 +187,11 @@ where
         })
     }
 
-    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+    fn encode<'a, A: AsyncWrite + Unpin + Send + Sync + ?Sized>(
         component_ref: &'a Self::ComponentType,
         context: &'a mut C,
         write: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+    ) -> PinnedLivelyResult<'a, ()> {
         Box::pin(async move {
             write.write_var_int(component_ref.len() as i32).await?;
             for item in component_ref {
@@ -220,16 +218,16 @@ where
 
 pub struct LimitedVec<T, const N: usize>(PhantomData<T>);
 
-impl<T, C, const N: usize> PacketComponent<C> for LimitedVec<T, N>
+impl<T, C: Send + Sync, const N: usize> PacketComponent<C> for LimitedVec<T, N>
 where
     T: PacketComponent<C>,
 {
     type ComponentType = Vec<T::ComponentType>;
 
-    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+    fn decode<'a, A: AsyncRead + Unpin + Send + Sync + ?Sized>(
         context: &'a mut C,
         read: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>> {
+    ) -> PinnedLivelyResult<'a, Self::ComponentType> {
         Box::pin(async move {
             let vec_size = read.read_var_int().await? as usize;
             if vec_size > N {
@@ -246,11 +244,11 @@ where
         })
     }
 
-    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+    fn encode<'a, A: AsyncWrite + Unpin + Send + Sync + ?Sized>(
         component_ref: &'a Self::ComponentType,
         context: &'a mut C,
         write: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+    ) -> PinnedLivelyResult<'a, ()> {
         if component_ref.len() > N {
             return Box::pin(async move {
                 throw_explain!(format!(

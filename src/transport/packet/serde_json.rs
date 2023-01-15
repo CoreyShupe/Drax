@@ -1,28 +1,27 @@
-use std::future::Future;
 use std::marker::PhantomData;
-use std::pin::Pin;
 
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::transport::packet::vec::VecU8;
 use crate::transport::packet::{PacketComponent, Size};
+use crate::PinnedLivelyResult;
 
 pub struct JsonDelegate<T> {
     _phantom_t: PhantomData<T>,
 }
 
-impl<C, T> PacketComponent<C> for JsonDelegate<T>
+impl<C: Send + Sync, T> PacketComponent<C> for JsonDelegate<T>
 where
     T: for<'de> Deserialize<'de>,
-    T: Serialize,
+    T: Serialize + Send + Sync,
 {
     type ComponentType = T;
 
-    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+    fn decode<'a, A: AsyncRead + Unpin + Send + Sync + ?Sized>(
         context: &'a mut C,
         read: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>>
+    ) -> PinnedLivelyResult<'a, Self::ComponentType>
     where
         Self: Sized,
     {
@@ -33,11 +32,11 @@ where
         })
     }
 
-    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+    fn encode<'a, A: AsyncWrite + Unpin + Send + Sync + ?Sized>(
         component_ref: &'a Self::ComponentType,
         context: &'a mut C,
         write: &'a mut A,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+    ) -> PinnedLivelyResult<'a, ()> {
         Box::pin(async move {
             let bytes = serde_json::to_vec(&component_ref)?;
             VecU8::encode(&bytes, context, write).await

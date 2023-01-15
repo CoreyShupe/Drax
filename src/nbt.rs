@@ -67,7 +67,7 @@ macro_rules! define_tags {
             }
         }
 
-        pub fn load_tag<'a, R: $crate::prelude::AsyncRead + Unpin + ?Sized>(read: &'a mut R, bit: u8, depth: i32, accounter: &'a mut $crate::nbt::NbtAccounter) -> $crate::PinnedLivelyResult<'a, Tag> {
+        pub fn load_tag<'a, R: $crate::prelude::AsyncRead + Unpin + Send + Sync + ?Sized>(read: &'a mut R, bit: u8, depth: i32, accounter: &'a mut $crate::nbt::NbtAccounter) -> $crate::PinnedLivelyResult<'a, Tag> {
             Box::pin(async move {
                 match bit {
                     $(
@@ -83,7 +83,7 @@ macro_rules! define_tags {
             })
         }
 
-        pub fn write_tag<'a, W: $crate::prelude::AsyncWrite + Unpin + ?Sized>(write: &'a mut W, tag: &'a Tag) -> $crate::PinnedLivelyResult<'a, ()> {
+        pub fn write_tag<'a, W: $crate::prelude::AsyncWrite + Unpin + Send + Sync + ?Sized>(write: &'a mut W, tag: &'a Tag) -> $crate::PinnedLivelyResult<'a, ()> {
             Box::pin(async move {
                 match tag {
                     $(
@@ -108,7 +108,7 @@ macro_rules! define_tags {
     };
 }
 
-async fn read_string<R: AsyncRead + Unpin + ?Sized>(
+async fn read_string<R: AsyncRead + Unpin + Send + Sync + ?Sized>(
     read: &mut R,
     accounter: &mut NbtAccounter,
 ) -> crate::prelude::Result<String> {
@@ -120,7 +120,7 @@ async fn read_string<R: AsyncRead + Unpin + ?Sized>(
     Ok(string)
 }
 
-async fn write_string<W: AsyncWrite + Unpin + ?Sized>(
+async fn write_string<W: AsyncWrite + Unpin + Send + Sync + ?Sized>(
     write: &mut W,
     reference: &String,
 ) -> crate::prelude::Result<()> {
@@ -470,10 +470,10 @@ mod tests {
 
 pub struct EnsuredCompoundTag<const LIMIT: u64 = 0>;
 
-impl<const LIMIT: u64, C> PacketComponent<C> for EnsuredCompoundTag<LIMIT> {
+impl<const LIMIT: u64, C: Send + Sync> PacketComponent<C> for EnsuredCompoundTag<LIMIT> {
     type ComponentType = Option<Tag>;
 
-    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+    fn decode<'a, A: AsyncRead + Unpin + Send + Sync + ?Sized>(
         _: &'a mut C,
         read: &'a mut A,
     ) -> PinnedLivelyResult<'a, Self::ComponentType> {
@@ -498,7 +498,7 @@ impl<const LIMIT: u64, C> PacketComponent<C> for EnsuredCompoundTag<LIMIT> {
         })
     }
 
-    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+    fn encode<'a, A: AsyncWrite + Unpin + Send + Sync + ?Sized>(
         component_ref: &'a Self::ComponentType,
         _: &'a mut C,
         write: &'a mut A,

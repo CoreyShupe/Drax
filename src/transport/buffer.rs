@@ -18,7 +18,7 @@ pub trait Limiter {
 
 impl<T> Limiter for T
 where
-    T: AsyncRead + Unpin,
+    T: AsyncRead + Unpin + Send + Sync,
 {
     fn hard_limit(&mut self, limit: usize) -> ReadLimiter<'_, Self>
     where
@@ -115,7 +115,7 @@ impl<'a, A> ReadLimiter<'a, A> {
 
 impl<'a, A> AsyncRead for ReadLimiter<'a, A>
 where
-    A: AsyncRead + Unpin,
+    A: AsyncRead + Unpin + Send + Sync,
 {
     fn poll_read(
         mut self: Pin<&mut Self>,
@@ -155,7 +155,7 @@ pub trait DraxReadExt {
     where
         Self: Sized;
 
-    fn decode_component<'a, C, P: PacketComponent<C>>(
+    fn decode_component<'a, C: Send + Sync, P: PacketComponent<C>>(
         &'a mut self,
         context: &'a mut C,
     ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<P::ComponentType>> + 'a>>
@@ -165,7 +165,7 @@ pub trait DraxReadExt {
 
 impl<T> DraxReadExt for T
 where
-    T: AsyncRead + Unpin + ?Sized,
+    T: AsyncRead + Unpin + Send + Sync + ?Sized,
 {
     fn read_var_int(&mut self) -> ReadVarInt<'_, Self> {
         var_num::read_var_int(self)
@@ -191,7 +191,7 @@ where
         DecryptRead::new(self, decryption)
     }
 
-    fn decode_component<'a, C, P: PacketComponent<C>>(
+    fn decode_component<'a, C: Send + Sync, P: PacketComponent<C>>(
         &'a mut self,
         context: &'a mut C,
     ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<P::ComponentType>> + 'a>>
@@ -217,7 +217,7 @@ pub trait DraxWriteExt {
     where
         Self: Sized;
 
-    fn encode_component<'a, C, P: PacketComponent<C>>(
+    fn encode_component<'a, C: Send + Sync, P: PacketComponent<C>>(
         &'a mut self,
         context: &'a mut C,
         component: &'a P::ComponentType,
@@ -226,7 +226,7 @@ pub trait DraxWriteExt {
 
 impl<T> DraxWriteExt for T
 where
-    T: AsyncWrite + Unpin + ?Sized,
+    T: AsyncWrite + Unpin + Send + Sync + ?Sized,
 {
     fn write_var_int(&mut self, value: i32) -> WriteVarInt<'_, Self> {
         var_num::write_var_int(self, value)
@@ -252,7 +252,7 @@ where
         EncryptedWriter::new(self, encryption)
     }
 
-    fn encode_component<'a, C, P: PacketComponent<C>>(
+    fn encode_component<'a, C: Send + Sync, P: PacketComponent<C>>(
         &'a mut self,
         context: &'a mut C,
         component: &'a P::ComponentType,

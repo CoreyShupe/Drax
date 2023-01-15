@@ -1,9 +1,8 @@
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 
-use crate::PinnedLivelyResult;
 use tokio::io::{AsyncRead, AsyncWrite};
+
+use crate::PinnedLivelyResult;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Size {
@@ -35,17 +34,17 @@ impl std::ops::Add<usize> for Size {
 }
 
 /// Defines a structure that can be encoded and decoded.
-pub trait PacketComponent<C> {
-    type ComponentType: Sized;
+pub trait PacketComponent<C: Send + Sync> {
+    type ComponentType: Sized + Send + Sync;
 
     /// Decodes the packet component from the given reader.
-    fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
+    fn decode<'a, A: AsyncRead + Unpin + Send + Sync + ?Sized>(
         context: &'a mut C,
         read: &'a mut A,
     ) -> PinnedLivelyResult<'a, Self::ComponentType>;
 
     /// Encodes the packet component to the given writer.
-    fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+    fn encode<'a, A: AsyncWrite + Unpin + Send + Sync + ?Sized>(
         component_ref: &'a Self::ComponentType,
         context: &'a mut C,
         write: &'a mut A,
@@ -58,21 +57,21 @@ macro_rules! impl_deref_component {
     ($impl_ty:ty, $c_ty:ty, $t_ty:ty) => {
         type ComponentType = $impl_ty;
 
-        fn decode<'a, A: $crate::prelude::AsyncRead + Unpin + ?Sized>(
+        fn decode<'a, A: $crate::prelude::AsyncRead + Unpin + Send + Sync + ?Sized>(
             context: &'a mut $c_ty,
             read: &'a mut A,
-        ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>> {
+        ) -> PinnedLivelyResult<'a, Self::ComponentType> {
             Box::pin(async move {
                 let component = T::decode(context, read).await?;
                 Ok(<$impl_ty>::new(component))
             })
         }
 
-        fn encode<'a, A: AsyncWrite + Unpin + ?Sized>(
+        fn encode<'a, A: AsyncWrite + Unpin + Send + Sync + ?Sized>(
             component_ref: &'a Self::ComponentType,
             context: &'a mut $c_ty,
             write: &'a mut A,
-        ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+        ) -> PinnedLivelyResult<'a, ()> {
             <$t_ty as $crate::prelude::PacketComponent<$c_ty>>::encode(
                 component_ref.as_ref(),
                 context,
@@ -86,22 +85,20 @@ macro_rules! impl_deref_component {
     };
 }
 
-impl<T, C> PacketComponent<C> for Box<T>
+impl<T, C: Send + Sync> PacketComponent<C> for Box<T>
 where
     T: PacketComponent<C>,
 {
     impl_deref_component!(Box<T::ComponentType>, C, T);
 }
 
-impl<T, C> PacketComponent<C> for Arc<T>
+impl<T, C: Send + Sync> PacketComponent<C> for Arc<T>
 where
     T: PacketComponent<C>,
 {
     impl_deref_component!(Arc<T::ComponentType>, C, T);
 }
 
-#[cfg(feature = "nbt")]
-pub mod nbt;
 pub mod option;
 pub mod primitive;
 #[cfg(feature = "serde")]
@@ -356,10 +353,10 @@ pub mod macros {
             $crate::expand_field!(@internal @impl_bind $enum_name, C $(@alt $ctx_ty)? {
                 type ComponentType = Self;
 
-                fn decode<'a, A: $crate::prelude::AsyncRead + Unpin + ?Sized>(
+                fn decode<'a, A: $crate::prelude::AsyncRead + Unpin + Send + Sync + ?Sized>(
                     __context: &'a mut ctx_type!(C),
                     __read: &'a mut A,
-                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = $crate::transport::Result<Self>> + 'a>>
+                ) -> $crate::PinnedLivelyResult<'a, Self::ComponentType>
                 where
                     Self: Sized
                 {
@@ -382,11 +379,11 @@ pub mod macros {
                     })
                 }
 
-                fn encode<'a, A: $crate::prelude::AsyncWrite + Unpin + ?Sized>(
+                fn encode<'a, A: $crate::prelude::AsyncWrite + Unpin + Send + Sync + ?Sized>(
                     component_ref: &'a Self,
                     __context: &'a mut ctx_type!(C),
                     __write: &'a mut A,
-                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = $crate::transport::Result<()>> + 'a>>
+                ) -> $crate::PinnedLivelyResult<'a, ()>
                 {
                     Box::pin(async move {
                         macro_rules! expand_key_types {
@@ -472,7 +469,7 @@ pub mod macros {
     #[macro_export]
     macro_rules! expand_field {
         (@internal @impl_bind $struct_name:ident, $field_name:ident { $($impl_tokens:tt)* }) => {
-            impl<$field_name> $crate::transport::packet::PacketComponent<$field_name> for $struct_name {
+            impl<$field_name: Send + Sync> $crate::transport::packet::PacketComponent<$field_name> for $struct_name {
                 $($impl_tokens)*
             }
         };
@@ -584,10 +581,10 @@ pub mod macros {
             $crate::expand_field!(@internal @impl_bind $struct_name, C $(@alt $ctx_ty)? {
                 type ComponentType = Self;
 
-                fn decode<'a, A: $crate::prelude::AsyncRead + Unpin + ?Sized>(
+                fn decode<'a, A: $crate::prelude::AsyncRead + Unpin + Send + Sync + ?Sized>(
                     __context: &'a mut ctx_type!(C),
                     __read: &'a mut A,
-                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = $crate::transport::Result<Self>> + 'a>>
+                ) -> $crate::PinnedLivelyResult<'a, Self::ComponentType>
                 where
                     Self: Sized,
                 {
@@ -603,11 +600,11 @@ pub mod macros {
                     })
                 }
 
-                fn encode <'a, A: $crate::prelude::AsyncWrite + Unpin + ?Sized> (
+                fn encode <'a, A: $crate::prelude::AsyncWrite + Unpin + Send + Sync + ?Sized> (
                     component_ref: &'a Self,
                     __context: &'a mut ctx_type!(C),
                     __write: & 'a mut A,
-                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = $crate::transport::Result<()>> + 'a>> {
+                ) -> $crate::PinnedLivelyResult<'a, ()> {
                     Box::pin(async move {
                         $($(
                         {
