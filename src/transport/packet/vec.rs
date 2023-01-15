@@ -93,8 +93,8 @@ where
     {
         Box::pin(async move {
             let mut arr: [MaybeUninit<T::ComponentType>; N] = MaybeUninit::uninit_array();
-            for i in 0..N {
-                arr[i] = MaybeUninit::new(T::decode(context, read).await?);
+            for i in &mut arr {
+                *i = MaybeUninit::new(T::decode(context, read).await?);
             }
             Ok(arr.map(|x| unsafe { x.assume_init() }))
         })

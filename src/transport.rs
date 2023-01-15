@@ -91,7 +91,7 @@ pub mod error {
                 #[cfg(feature = "serde")]
                 ErrorType::SerdeJsonError(err) => write!(f, "SerdeJsonError {err}"),
                 #[cfg(feature = "nbt")]
-                ErrorType::Cesu8DecodingError(err) => write!(f, "Cesu8DecodingError {}", err),
+                ErrorType::Cesu8DecodingError(err) => write!(f, "Cesu8DecodingError {err}"),
                 ErrorType::UuidError(err) => write!(f, "UuidError {err}"),
                 #[cfg(feature = "anyhow")]
                 ErrorType::AnyhowError(err) => write!(f, "AnyhowError {err}"),

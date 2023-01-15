@@ -122,15 +122,15 @@ async fn read_string<R: AsyncRead + Unpin + Send + Sync + ?Sized>(
 
 async fn write_string<W: AsyncWrite + Unpin + Send + Sync + ?Sized>(
     write: &mut W,
-    reference: &String,
+    reference: &str,
 ) -> crate::prelude::Result<()> {
     let cesu_8 = &cesu8::to_java_cesu8(reference);
-    write.write_u16((&cesu_8).len() as u16).await?;
-    write.write_all(&cesu_8).await?;
+    write.write_u16(cesu_8.len() as u16).await?;
+    write.write_all(cesu_8).await?;
     Ok(())
 }
 
-fn size_string(reference: &String) -> crate::prelude::Result<usize> {
+fn size_string(reference: &str) -> crate::prelude::Result<usize> {
     Ok(2 + cesu8::to_java_cesu8(reference).len())
 }
 
@@ -484,8 +484,7 @@ impl<const LIMIT: u64, C: Send + Sync> PacketComponent<C> for EnsuredCompoundTag
             }
             if b != 10 {
                 throw_explain!(format!(
-                    "Invalid tag bit. Expected compound tag; received {}",
-                    b
+                    "Invalid tag bit. Expected compound tag; received {b}"
                 ));
             }
             let mut accounter = NbtAccounter {
@@ -504,16 +503,15 @@ impl<const LIMIT: u64, C: Send + Sync> PacketComponent<C> for EnsuredCompoundTag
         write: &'a mut A,
     ) -> PinnedLivelyResult<'a, ()> {
         Box::pin(async move {
-            let mut buffer = Cursor::new(Vec::with_capacity(match Self::size(
-                &component_ref,
-                &mut (),
-            )? {
-                Size::Dynamic(x) | Size::Constant(x) => x,
-            } as usize));
+            let mut buffer = Cursor::new(Vec::with_capacity(
+                match Self::size(component_ref, &mut ())? {
+                    Size::Dynamic(x) | Size::Constant(x) => x,
+                },
+            ));
             match component_ref {
                 Some(tag) => {
                     buffer.write_u8(10).await?;
-                    write_string(&mut buffer, &format!("")).await?;
+                    write_string(&mut buffer, "").await?;
                     write_tag(&mut buffer, tag).await?;
                     let inner = buffer.into_inner();
                     write.write_all(&inner).await?;
