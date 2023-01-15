@@ -645,6 +645,7 @@ mod tcp_shield {
     use std::future::Future;
     use std::pin::Pin;
 
+    use crate::PinnedLivelyResult;
     use tokio::io::{AsyncRead, AsyncWrite};
 
     use crate::prelude::{DraxReadExt, DraxWriteExt, PacketComponent};
@@ -658,8 +659,7 @@ mod tcp_shield {
         fn decode<'a, A: AsyncRead + Unpin + ?Sized>(
             context: &'a mut C,
             read: &'a mut A,
-        ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<Self::ComponentType>> + 'a>>
-        {
+        ) -> PinnedLivelyResult<'a, Self::ComponentType> {
             Box::pin(async move {
                 let _ = read.read_var_int().await?;
                 let out = String::decode(context, read).await?;
@@ -673,7 +673,7 @@ mod tcp_shield {
             component_ref: &'a Self::ComponentType,
             context: &'a mut C,
             write: &'a mut A,
-        ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+        ) -> PinnedLivelyResult<'a, ()> {
             Box::pin(async move {
                 write.write_var_int(0).await?;
                 String::encode(component_ref, context, write).await?;

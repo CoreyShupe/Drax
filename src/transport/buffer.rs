@@ -1,9 +1,8 @@
-use crate::err_explain;
 use crate::prelude::PacketComponent;
 use crate::transport::buffer::var_num::{ReadVarInt, ReadVarLong, WriteVarInt, WriteVarLong};
 #[cfg(feature = "encryption")]
 use crate::transport::encryption::{DecryptRead, Decryption, EncryptedWriter, Encryption};
-use std::future::Future;
+use crate::{err_explain, PinnedLivelyResult};
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
@@ -158,7 +157,7 @@ pub trait DraxReadExt {
     fn decode_component<'a, C: Send + Sync, P: PacketComponent<C>>(
         &'a mut self,
         context: &'a mut C,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<P::ComponentType>> + 'a>>
+    ) -> PinnedLivelyResult<'a, P::ComponentType>
     where
         P: Sized;
 }
@@ -194,7 +193,7 @@ where
     fn decode_component<'a, C: Send + Sync, P: PacketComponent<C>>(
         &'a mut self,
         context: &'a mut C,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<P::ComponentType>> + 'a>>
+    ) -> PinnedLivelyResult<'a, P::ComponentType>
     where
         P: Sized,
     {
@@ -221,7 +220,7 @@ pub trait DraxWriteExt {
         &'a mut self,
         context: &'a mut C,
         component: &'a P::ComponentType,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>>;
+    ) -> PinnedLivelyResult<'a, ()>;
 }
 
 impl<T> DraxWriteExt for T
@@ -256,7 +255,7 @@ where
         &'a mut self,
         context: &'a mut C,
         component: &'a P::ComponentType,
-    ) -> Pin<Box<dyn Future<Output = crate::prelude::Result<()>> + 'a>> {
+    ) -> PinnedLivelyResult<'a, ()> {
         P::encode(component, context, self)
     }
 }
