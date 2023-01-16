@@ -1,7 +1,7 @@
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
-use aes::cipher::AsyncStreamCipher;
+pub use aes::cipher::AsyncStreamCipher;
 pub use aes::cipher::NewCipher;
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, ReadBuf};
