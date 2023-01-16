@@ -144,16 +144,6 @@ pub trait DraxReadExt {
 
     fn read_var_long(&mut self) -> ReadVarLong<'_, Self>;
 
-    #[cfg(feature = "encryption")]
-    fn no_crypt_wrap(self) -> DecryptRead<Self>
-    where
-        Self: Sized;
-
-    #[cfg(feature = "encryption")]
-    fn decrypt_stream(self, cipher_key: &[u8]) -> DecryptRead<Self>
-    where
-        Self: Sized;
-
     fn decode_component<'a, C: Send + Sync, P: PacketComponent<C>>(
         &'a mut self,
         context: &'a mut C,
@@ -174,22 +164,6 @@ where
         var_num::read_var_long(self)
     }
 
-    #[cfg(feature = "encryption")]
-    fn no_crypt_wrap(self) -> DecryptRead<Self>
-    where
-        Self: Sized,
-    {
-        DecryptRead::noop(self)
-    }
-
-    #[cfg(feature = "encryption")]
-    fn decrypt_stream(self, cipher_key: &[u8]) -> DecryptRead<Self>
-    where
-        Self: Sized,
-    {
-        DecryptRead::new(self, cipher_key)
-    }
-
     fn decode_component<'a, C: Send + Sync, P: PacketComponent<C>>(
         &'a mut self,
         context: &'a mut C,
@@ -205,16 +179,6 @@ pub trait DraxWriteExt {
     fn write_var_int(&mut self, value: i32) -> WriteVarInt<'_, Self>;
 
     fn write_var_long(&mut self, value: i64) -> WriteVarLong<'_, Self>;
-
-    #[cfg(feature = "encryption")]
-    fn no_crypt_wrap(self) -> EncryptedWriter<Self>
-    where
-        Self: Sized;
-
-    #[cfg(feature = "encryption")]
-    fn encrypt_stream(self, cipher_key: &[u8]) -> EncryptedWriter<Self>
-    where
-        Self: Sized;
 
     fn encode_component<'a, C: Send + Sync, P: PacketComponent<C>>(
         &'a mut self,
@@ -233,22 +197,6 @@ where
 
     fn write_var_long(&mut self, value: i64) -> WriteVarLong<'_, Self> {
         var_num::write_var_long(self, value)
-    }
-
-    #[cfg(feature = "encryption")]
-    fn no_crypt_wrap(self) -> EncryptedWriter<Self>
-    where
-        Self: Sized,
-    {
-        EncryptedWriter::noop(self)
-    }
-
-    #[cfg(feature = "encryption")]
-    fn encrypt_stream(self, cipher_key: &[u8]) -> EncryptedWriter<Self>
-    where
-        Self: Sized,
-    {
-        EncryptedWriter::new(self, cipher_key)
     }
 
     fn encode_component<'a, C: Send + Sync, P: PacketComponent<C>>(
