@@ -1,7 +1,5 @@
 use crate::prelude::PacketComponent;
 use crate::transport::buffer::var_num::{ReadVarInt, ReadVarLong, WriteVarInt, WriteVarLong};
-#[cfg(feature = "encryption")]
-use crate::transport::encryption::{DecryptRead, EncryptedWriter};
 use crate::{err_explain, PinnedLivelyResult};
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
