@@ -1,6 +1,7 @@
 use aes::Aes128;
 use cfb8;
-use cfb8::cipher::{BlockDecryptMut, BlockEncryptMut};
+use cfb8::cipher::inout::InOutBuf;
+use cfb8::cipher::{Block, BlockDecryptMut, BlockEncryptMut};
 use pin_project_lite::pin_project;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
@@ -53,8 +54,8 @@ impl<W: AsyncWrite + Unpin + Sized> AsyncWrite for EncryptedWriter<W> {
         let mut me = self.project();
         match me.stream.as_pin_mut() {
             None => Pin::new(&mut me.write).poll_write(cx, &block_copy),
-            Some(mut stream) => {
-                stream.encrypt_block_mut(block_copy.as_mut_slice().into());
+            Some(stream) => {
+                encrypt(stream, block_copy.as_mut_slice().into());
                 Pin::new(&mut me.write).poll_write(cx, &block_copy)
             }
         }
@@ -106,13 +107,13 @@ impl<R: AsyncRead + Unpin + Sized> AsyncRead for DecryptRead<R> {
     ) -> Poll<std::io::Result<()>> {
         let mut me = self.project();
         match me.stream.as_pin_mut() {
-            Some(mut stream) => unsafe {
+            Some(stream) => unsafe {
                 let mut buf_read = ReadBuf::uninit(buf.unfilled_mut());
 
                 ready!(Pin::new(&mut me.read).poll_read(cx, &mut buf_read)?);
 
                 let filled_mut = buf_read.filled_mut();
-                stream.decrypt_block_mut(filled_mut.into());
+                decrypt(stream, filled_mut.into());
 
                 let len = buf_read.filled().len();
                 buf.assume_init(len);
@@ -121,6 +122,30 @@ impl<R: AsyncRead + Unpin + Sized> AsyncRead for DecryptRead<R> {
             },
             None => Pin::new(&mut me.read).poll_read(cx, buf),
         }
+    }
+}
+
+fn encrypt(mut encryption: Pin<&mut Encryption>, data: InOutBuf<'_, '_, u8>) {
+    let (blocks, mut tail) = data.into_chunks();
+    encryption.encrypt_blocks_inout_mut(blocks);
+    let n = tail.len();
+    if n != 0 {
+        let mut block = Block::<Encryption>::default();
+        block[..n].copy_from_slice(tail.get_in());
+        encryption.encrypt_block_mut(&mut block);
+        tail.get_out().copy_from_slice(&block[..n]);
+    }
+}
+
+fn decrypt(mut decryption: Pin<&mut Decryption>, data: InOutBuf<'_, '_, u8>) {
+    let (blocks, mut tail) = data.into_chunks();
+    decryption.decrypt_blocks_inout_mut(blocks);
+    let n = tail.len();
+    if n != 0 {
+        let mut block = Block::<Decryption>::default();
+        block[..n].copy_from_slice(tail.get_in());
+        decryption.decrypt_block_mut(&mut block);
+        tail.get_out().copy_from_slice(&block[..n]);
     }
 }
 
