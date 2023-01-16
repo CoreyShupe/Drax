@@ -12,7 +12,7 @@ pub type Cipher = cfb8::Cfb8<aes::Aes128>;
 pin_project! {
     pub struct CipherAttachedReader<'a, R> {
         pub(crate) inner: &'a mut R,
-        pub(crate) cipher: Cipher,
+        pub(crate) cipher: &'a mut Cipher,
     }
 }
 

@@ -17,7 +17,7 @@ pub trait DraxReadExt {
     where
         P: Sized;
 
-    fn decrypt(&mut self, cipher: Cipher) -> CipherAttachedReader<Self>
+    fn decrypt<'a>(&'a mut self, cipher: &'a mut Cipher) -> CipherAttachedReader<'a, Self>
     where
         Self: Sized;
 }
@@ -44,7 +44,7 @@ where
         P::decode(context, self)
     }
 
-    fn decrypt(&mut self, cipher: Cipher) -> CipherAttachedReader<Self>
+    fn decrypt<'a>(&'a mut self, cipher: &'a mut Cipher) -> CipherAttachedReader<'a, Self>
     where
         Self: Sized,
     {
