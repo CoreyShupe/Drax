@@ -1,7 +1,7 @@
 use crate::prelude::PacketComponent;
 use crate::transport::buffer::var_num::{ReadVarInt, ReadVarLong, WriteVarInt, WriteVarLong};
 #[cfg(feature = "encryption")]
-use crate::transport::encryption::{DecryptRead, Decryption, EncryptedWriter, Encryption};
+use crate::transport::encryption::{DecryptRead, EncryptedWriter};
 use crate::{err_explain, PinnedLivelyResult};
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
@@ -150,7 +150,7 @@ pub trait DraxReadExt {
         Self: Sized;
 
     #[cfg(feature = "encryption")]
-    fn decrypt_stream(self, decryption: Decryption) -> DecryptRead<Self>
+    fn decrypt_stream(self, cipher_key: &[u8]) -> DecryptRead<Self>
     where
         Self: Sized;
 
@@ -183,11 +183,11 @@ where
     }
 
     #[cfg(feature = "encryption")]
-    fn decrypt_stream(self, decryption: Decryption) -> DecryptRead<Self>
+    fn decrypt_stream(self, cipher_key: &[u8]) -> DecryptRead<Self>
     where
         Self: Sized,
     {
-        DecryptRead::new(self, decryption)
+        DecryptRead::new(self, cipher_key)
     }
 
     fn decode_component<'a, C: Send + Sync, P: PacketComponent<C>>(
@@ -212,7 +212,7 @@ pub trait DraxWriteExt {
         Self: Sized;
 
     #[cfg(feature = "encryption")]
-    fn encrypt_stream(self, encryption: Encryption) -> EncryptedWriter<Self>
+    fn encrypt_stream(self, cipher_key: &[u8]) -> EncryptedWriter<Self>
     where
         Self: Sized;
 
@@ -244,11 +244,11 @@ where
     }
 
     #[cfg(feature = "encryption")]
-    fn encrypt_stream(self, encryption: Encryption) -> EncryptedWriter<Self>
+    fn encrypt_stream(self, cipher_key: &[u8]) -> EncryptedWriter<Self>
     where
         Self: Sized,
     {
-        EncryptedWriter::new(self, encryption)
+        EncryptedWriter::new(self, cipher_key)
     }
 
     fn encode_component<'a, C: Send + Sync, P: PacketComponent<C>>(
