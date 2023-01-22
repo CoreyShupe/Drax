@@ -468,6 +468,31 @@ mod tests {
     }
 }
 
+#[macro_export]
+macro_rules! tag {
+    ($(
+        $tag_field_name:ident: $tag_value:expr
+    ),*) => {
+        {
+            let mut data = vec![];
+            $(
+            data.push((stringify!($tag_field_name), $tag_value));
+            )*
+            $crate::nbt::Tag::compound_tag(data)
+        }
+    }
+}
+
+impl Tag {
+    pub fn string<S: Into<String>>(into: S) -> Tag {
+        Tag::TagString(into.into())
+    }
+
+    pub fn compound_tag<S: Into<String>>(data: Vec<(S, Tag)>) -> Self {
+        Tag::CompoundTag(data.into_iter().map(|(x, y)| (x.into(), y)).collect())
+    }
+}
+
 pub struct EnsuredCompoundTag<const LIMIT: u64 = 0>;
 
 impl<const LIMIT: u64, C: Send + Sync> PacketComponent<C> for EnsuredCompoundTag<LIMIT> {
